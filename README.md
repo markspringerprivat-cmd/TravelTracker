@@ -1,23 +1,22 @@
 # Travel Tracker
 
-Statische Web-App für GitHub Pages. Keine Installation und kein Backend erforderlich.
+Statischer Prototyp für GitHub Pages (HTML, CSS, JavaScript).
 
 ## Funktionen
-- Kategorien: Reise, Wandern, Geburtstag
-- Hintergrund-Auswahl
-- 1–10 Ziele
-- drei Startlayouts
-- freier Layout-Editor: Kacheln per Maus oder Touch verschieben und drehen
-- Verbindungslinien: gestrichelt, durchgängig oder aus
-- Anschluss der Linie je Kachel: automatisch, oben, rechts, unten oder links
-- Fotos per Upload/Kamera
-- lokale Speicherung mit IndexedDB
-- Export/Import aller Tracker als `.traveltracker`
-- teilbare eigenständige HTML-Ansicht
-- randloser PDF-Export über html2canvas + jsPDF (CDN); Fallback ist die Druckansicht
+- Kategorien Reise, Wandern und Geburtstag
+- verschiedene Hintergründe und Startlayouts
+- 1–10 frei benennbare Ziele
+- lokale dauerhafte Speicherung über IndexedDB
+- getrennte Fotoaktionen: **Foto machen** (Kamera auf unterstützten Smartphones) und **Foto auswählen** (Fotomediathek/Dateien)
+- Fotos werden nach Auswahl/Aufnahme sofort dem Ziel zugeordnet und lokal gespeichert
+- freier Layout-Editor: Kacheln verschieben und drehen
+- konfigurierbare Verbindungslinien
+- randloser PDF-Export
+- interaktive teilbare HTML-Ansicht; Fotos lassen sich per Klick/Tipp groß in einer Lightbox öffnen und wieder schließen
+- Export/Import aller Tracker inklusive Fotos als `.traveltracker`-Sicherung
+- responsive Oberfläche für Smartphone und Desktop
 
 ## GitHub Pages
-Repository-Inhalt hochladen und unter **Settings → Pages** den Branch `main` und `/ (root)` veröffentlichen.
+Den Inhalt dieses Ordners in ein Repository hochladen und unter **Settings → Pages** die Veröffentlichung aus dem gewünschten Branch aktivieren.
 
-## Hinweis zum PDF
-Der direkte PDF-Download lädt beim ersten Export zwei kleine JavaScript-Bibliotheken von jsDelivr. Dadurch enthält die PDF keine Browser-Kopf-/Fußzeilen wie URL, Datum oder Seitenzahl. Falls die Bibliotheken nicht erreichbar sind, fällt die App auf den Browser-Druckdialog zurück; dort müssen Kopf- und Fußzeilen ggf. manuell deaktiviert werden.
+Hinweis: Die Daten des normalen Trackers liegen lokal im jeweiligen Browser. Die geteilte HTML-Datei enthält die fertige Erinnerung inklusive Fotos und kann ohne Travel-Tracker-Datenbank geöffnet werden.
