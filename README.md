@@ -1,31 +1,23 @@
 # Travel Tracker
 
-Statische, responsive Web-App für GitHub Pages. Keine Serverkomponente erforderlich.
+Statische Web-App für GitHub Pages. Keine Installation und kein Backend erforderlich.
 
 ## Funktionen
-- Start-Dashboard mit Kacheln
 - Kategorien: Reise, Wandern, Geburtstag
-- drei Design-/Hintergrundoptionen je Kategorie
-- 1 bis 10 Ziele pro Tracker
-- Fotoaufnahme bzw. Bildauswahl je Ziel
-- lokale dauerhafte Speicherung in IndexedDB
-- Bibliothek aller lokal gespeicherten Tracker
-- manuelles Speichern + automatische Speicherung bei Änderungen
-- Abschluss erst möglich, wenn alle Ziele ein Foto besitzen
-- PDF-Ausgabe über den Browser-Druckdialog (`Als PDF speichern`)
-- eigenständige HTML-Ansichtsdatei zum Teilen; auf kompatiblen Mobilgeräten auch über das System-Teilen-Menü
-- Export der gesamten Bibliothek als `.traveltracker`-Sicherungsdatei
-- Import einer solchen Sicherung auf demselben oder einem anderen Gerät
-- responsive Darstellung für Smartphone und Desktop
+- Hintergrund-Auswahl
+- 1–10 Ziele
+- drei Startlayouts
+- freier Layout-Editor: Kacheln per Maus oder Touch verschieben und drehen
+- Verbindungslinien: gestrichelt, durchgängig oder aus
+- Anschluss der Linie je Kachel: automatisch, oben, rechts, unten oder links
+- Fotos per Upload/Kamera
+- lokale Speicherung mit IndexedDB
+- Export/Import aller Tracker als `.traveltracker`
+- teilbare eigenständige HTML-Ansicht
+- randloser PDF-Export über html2canvas + jsPDF (CDN); Fallback ist die Druckansicht
 
 ## GitHub Pages
-Den Inhalt dieses Ordners in ein GitHub-Repository hochladen und unter **Settings → Pages** GitHub Pages für den gewünschten Branch aktivieren.
+Repository-Inhalt hochladen und unter **Settings → Pages** den Branch `main` und `/ (root)` veröffentlichen.
 
-## Wichtiger Hinweis zur lokalen Speicherung
-IndexedDB gehört zum jeweiligen Browser/Endgerät. Browserdaten löschen oder die Website-Daten entfernen kann die lokale Bibliothek löschen. Daher regelmäßig über **Alle exportieren** eine Sicherungsdatei anlegen.
-
-## PDF
-Der Button **PDF herunterladen** öffnet den Druckdialog des Browsers. Dort `Als PDF speichern` wählen. Das ist auf GitHub Pages vollständig clientseitig möglich und benötigt keine PDF-Bibliothek.
-
-## Teilen
-Die App erzeugt eine eigenständige HTML-Datei mit allen Bildern des abgeschlossenen Trackers. Diese kann per Messenger, E-Mail, Cloud etc. weitergegeben und von anderen im Browser geöffnet werden. Es wird dafür kein Cloud-Backend benötigt.
+## Hinweis zum PDF
+Der direkte PDF-Download lädt beim ersten Export zwei kleine JavaScript-Bibliotheken von jsDelivr. Dadurch enthält die PDF keine Browser-Kopf-/Fußzeilen wie URL, Datum oder Seitenzahl. Falls die Bibliotheken nicht erreichbar sind, fällt die App auf den Browser-Druckdialog zurück; dort müssen Kopf- und Fußzeilen ggf. manuell deaktiviert werden.
