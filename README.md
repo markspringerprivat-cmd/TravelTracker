@@ -24,3 +24,10 @@ Die angezeigte Entfernung ist die Luftlinie zwischen den gespeicherten GPS-Punkt
 ## GitHub Pages
 
 Repository zu GitHub hochladen und unter **Settings → Pages** die Bereitstellung aus dem Hauptbranch/root aktivieren.
+
+
+## iOS-Update
+- Geteilte Präsentation ist auf einen festen, nicht scrollbaren Viewport begrenzt und zentriert Karten dynamisch.
+- Vor-/Zurücknavigation nutzt randnahe Pfeile; nur der mögliche Vorwärtspfeil pulsiert.
+- Standortabfrage wird unter iOS direkt aus dem Benutzer-Tap gestartet, ohne vorherige asynchrone Unterbrechung.
+- GPS nutzt watchPosition mit Fallback auf getCurrentPosition und speichert Distanzwerte lokal.
