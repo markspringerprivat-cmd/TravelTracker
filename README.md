@@ -1,26 +1,23 @@
 # Travel Tracker
 
-Statische Web-App für GitHub Pages. Keine Serverkomponente erforderlich.
+Statische GitHub-Pages-App mit lokaler Speicherung per IndexedDB.
+
+## Dateien
+- `index.html` – Erstellen und Bearbeiten der Tracker
+- `viewer.html` – eigene Vollbild-Reiseansicht im Browser
+- `app.js` / `styles.css` – Hauptanwendung
+- `viewer.js` / `viewer.css` – interaktive Reisepräsentation
+- `assets/` – Hintergründe
 
 ## Neu in dieser Version
-
-- lokale Speicherung aller Tracker und Fotos über IndexedDB
-- Teilnehmer/Namen pro Tracker
-- pro Ziel: Foto, Titel, automatisch gesetzter und editierbarer Zeitpunkt, optionaler Informationstext
-- getrennte Aktionen „Foto machen“ und „Foto auswählen“
-- optionale Standorterfassung mit eigener Erklärung vor der Browser-Berechtigungsabfrage
-- GPS-Koordinaten werden nur nach Zustimmung im lokalen Tracker gespeichert
-- Luftlinienentfernung zwischen zwei Zielen, wenn beide Ziele Standortdaten besitzen
-- Distanzanzeige an den Verbindungslinien
-- animierte, selbstständige HTML-Präsentation zum Teilen mit Willkommen-Seite, Ziel-für-Ziel-Navigation, Wischgesten und Foto-Lightbox
-- PDF-Export, Bibliotheks-Export und -Import
-
-## Standort
-
-Die Geolocation-API funktioniert in normalen Browsern nur in einem sicheren Kontext, z. B. über HTTPS. GitHub Pages stellt HTTPS bereit. Die App liest nicht automatisch GPS-Metadaten aus hochgeladenen Fotos aus. Stattdessen wird – nach einer erklärenden Abfrage und ausdrücklicher Zustimmung – der aktuelle Gerätestandort erfasst.
-
-Die angezeigte Entfernung ist die Luftlinie zwischen den gespeicherten GPS-Punkten, nicht die tatsächlich gelaufene oder gefahrene Strecke.
+- „Reise ansehen“ öffnet `viewer.html?id=...` statt einer lokal erzeugten HTML-Datei. Die Viewer-Seite liest die Reise aus derselben IndexedDB und läuft als normale GitHub-Pages-Webseite.
+- Kein GPS- oder Browser-Standortzugriff mehr.
+- Ziele können optional einen Ort/Adresse und einen Google-Maps-Link speichern.
+- Google-Maps-Suche erfolgt über Maps URLs ohne API-Key.
+- Schnellzugriff und Bibliothek haben pro Tracker ein X zum Löschen mit Bestätigungsdialog.
 
 ## GitHub Pages
+Alle Dateien in dasselbe Repository hochladen. In GitHub unter Settings → Pages die Veröffentlichung aus dem gewünschten Branch aktivieren.
 
-Repository zu GitHub hochladen und unter **Settings → Pages** die Bereitstellung aus dem Hauptbranch/root aktivieren.
+## Hinweis zum Teilen
+Die lokale `viewer.html?id=...`-Ansicht funktioniert auf demselben Browser/Gerät, weil die Reise in IndexedDB liegt. Für einen echten Link, den andere Geräte ohne Import öffnen können, ist später ein Online-Speicher/Backend für Tracker und Fotos nötig. Der bestehende Button „Ansicht teilen“ erzeugt deshalb weiterhin eine portable HTML-Datei.
