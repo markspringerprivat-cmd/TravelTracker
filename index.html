@@ -10,14 +10,15 @@
 </head>
 <body>
 <div class="app-shell">
-  <header class="topbar">
+  <header class="topbar" id="topbar">
     <button class="brand" id="brandHome" type="button" aria-label="Zum Hauptmenü">
       <span class="brand-mark">TT</span>
       <span><strong>Travel Tracker</strong><small>Erlebnisse planen & festhalten</small></span>
     </button>
+    <button class="header-home-btn hidden" id="headerHomeBtn" type="button">Hauptmenü</button>
   </header>
 
-  <main>
+  <main id="mainContent">
     <section class="screen active" id="screenHome">
       <div class="hero home-hero">
         <span class="eyebrow">TRAVEL TRACKER</span>
@@ -44,7 +45,7 @@
     </section>
 
     <section class="screen" id="screenCategories">
-      <div class="step-header"><button class="back-btn" data-nav="home" type="button">← Abbrechen</button><span class="eyebrow">1 / 4</span></div>
+      <div class="step-header"><button class="back-btn" data-nav="home" type="button">← Abbrechen</button><span class="eyebrow">1 / 3</span></div>
       <div class="hero compact"><h1>Was möchtest du festhalten?</h1><p>Wähle die passende Kategorie.</p></div>
       <div class="category-grid">
         <button class="category-card" data-category="travel" type="button"><span class="category-icon">✈</span><span class="category-copy"><strong>Reise</strong><small>Städte, Stopps und besondere Momente</small></span><span class="arrow">→</span></button>
@@ -54,57 +55,82 @@
     </section>
 
     <section class="screen" id="screenBackgrounds">
-      <div class="step-header"><button class="back-btn" data-nav="categories" type="button">← Zurück</button><span class="eyebrow">2 / 4</span></div>
+      <div class="step-header"><button class="back-btn" data-nav="categories" type="button">← Zurück</button><span class="eyebrow">2 / 3</span></div>
       <div class="hero compact"><h1>Wähle einen Hintergrund</h1><p>Das Motiv wird später auch in der Reiseansicht verwendet.</p></div>
       <div class="background-grid" id="backgroundGrid"></div>
     </section>
 
     <section class="screen" id="screenSetup">
-      <div class="step-header"><button class="back-btn" data-nav="backgrounds" type="button">← Zurück</button><span class="eyebrow">3 / 4</span></div>
-      <div class="hero compact"><h1>Tracker einrichten</h1><p>Gib deinem Erlebnis einen Namen, trage die Mitreisenden ein und bestimme 1 bis 10 Ziele.</p></div>
+      <div class="step-header"><button class="back-btn" data-nav="backgrounds" type="button">← Zurück</button><span class="eyebrow">3 / 3</span></div>
+      <div class="hero compact"><h1>Tracker einrichten</h1><p>Gib deinem Erlebnis einen Titel und trage ein, wer dabei ist. Die Stationen gestaltest du anschließend direkt auf der Seite.</p></div>
       <div class="setup-card">
         <label class="field-label">Titel<input id="projectTitle" type="text" maxlength="60" placeholder="z. B. Köln-Wochenende"></label>
         <div class="field-label">Wie viele Personen sind dabei?<div class="counter"><button id="decreasePeople" type="button">−</button><output id="peopleCount">1</output><button id="increasePeople" type="button">＋</button></div></div>
         <div class="participant-fields" id="participantFields"></div>
-        <div class="field-label">Anzahl der Ziele<div class="counter"><button id="decreaseGoals" type="button">−</button><output id="goalCount">6</output><button id="increaseGoals" type="button">＋</button></div></div>
-        <button id="continueToLayoutBtn" class="primary-btn large" type="button">Weiter zum Layout</button>
+        <button id="createTrackerBtn" class="primary-btn large" type="button">Tracker erstellen</button>
       </div>
-    </section>
-
-    <section class="screen" id="screenLayouts">
-      <div class="step-header"><button class="back-btn" data-nav="setup" type="button">← Zurück</button><span class="eyebrow">4 / 4</span></div>
-      <div class="hero compact"><h1>Wähle ein Startlayout</h1><p>Du kannst danach jede Kachel frei verschieben und drehen.</p></div>
-      <div class="layout-grid" id="layoutGrid"></div>
     </section>
 
     <section class="screen tracker-screen" id="screenTracker">
-      <div class="tracker-toolbar">
-        <div><span class="eyebrow" id="trackerCategoryLabel">REISE</span><h1 id="trackerTitle">Unser Abenteuer</h1><p id="saveState">Lokal gespeichert</p></div>
-        <div class="toolbar-actions"><button class="ghost-btn" id="layoutEditBtn" type="button">Layout bearbeiten</button><button class="ghost-btn" id="saveBtn" type="button">Speichern</button><button class="ghost-btn" id="trackerHomeBtn" type="button">Hauptmenü</button><button class="primary-btn" id="finishBtn" type="button">Tracker abschließen</button></div>
-      </div>
-      <div class="progress-wrap"><div class="progress-label"><span>Fortschritt</span><strong id="progressText">0 / 6</strong></div><div class="progress-track"><div id="progressBar" class="progress-bar"></div></div></div>
+      <div class="tracker-workspace">
+        <div class="tracker-strip">
+          <div class="tracker-strip-title">
+            <span class="eyebrow" id="trackerCategoryLabel">REISE</span>
+            <strong id="trackerTitle">Unser Abenteuer</strong>
+            <small id="saveState">Lokal gespeichert</small>
+          </div>
+          <div class="tracker-strip-actions">
+            <button class="mode-btn" id="editModeBtn" type="button" aria-pressed="false">✦ Bearbeitungsmodus</button>
+            <button class="ghost-btn compact-btn" id="toolsBtn" type="button" aria-expanded="false">Tools ▾</button>
+            <button class="primary-btn compact-btn" id="actionMenuBtn" type="button" aria-expanded="false">Menü öffnen ▾</button>
+          </div>
+        </div>
 
-      <div class="layout-editor hidden" id="layoutEditor">
-        <div class="editor-head"><div><strong>Layout-Editor</strong><span>Kachel antippen und ziehen. Einstellungen gelten für die ausgewählte Kachel.</span></div><button class="primary-btn" id="doneLayoutBtn" type="button">Fertig</button></div>
-        <div class="editor-controls">
-          <div class="control-group"><span>Ausgewähltes Ziel</span><strong id="selectedGoalLabel">Keines</strong></div>
-          <div class="control-group"><span>Drehung</span><div class="segmented"><button id="rotateLeftBtn" type="button">↶</button><button id="rotationResetBtn" type="button">0°</button><button id="rotateRightBtn" type="button">↷</button></div></div>
-          <label class="control-group"><span>Eingang von vorher</span><select id="entrySideSelect"><option value="auto">Automatisch</option><option value="top">Oben</option><option value="right">Rechts</option><option value="bottom">Unten</option><option value="left">Links</option></select></label>
-          <label class="control-group"><span>Ausgang zum nächsten</span><select id="exitSideSelect"><option value="auto">Automatisch</option><option value="top">Oben</option><option value="right">Rechts</option><option value="bottom">Unten</option><option value="left">Links</option></select></label>
-          <label class="control-group"><span>Verbindungslinie</span><select id="lineStyleSelect"><option value="dashed">Gestrichelt</option><option value="solid">Durchgängig</option><option value="none">Keine Linie</option></select></label>
-          <button class="ghost-btn" id="resetLayoutBtn" type="button">Startlayout zurücksetzen</button>
+        <div class="popover-panel tools-panel hidden" id="toolsPanel" role="dialog" aria-label="Design-Tools">
+          <div class="popover-head"><strong>Design-Tools</strong><button class="mini-close" id="toolsCloseBtn" type="button" aria-label="Tools schließen">×</button></div>
+          <label>Verbindungslinie
+            <select id="lineStyleSelect"><option value="dashed">Gestrichelt</option><option value="solid">Durchgezogen</option><option value="none">Keine Linie</option></select>
+          </label>
+          <label>Form der Kacheln
+            <select id="cardShapeSelect"><option value="rounded">Abgerundet</option><option value="square">Eckig</option><option value="circle">Rund</option><option value="polaroid">Polaroid</option></select>
+          </label>
+          <label class="toggle-row"><span>Nur Fotos anzeigen</span><input id="photoOnlyToggle" type="checkbox" role="switch"></label>
+          <div class="tool-button-grid">
+            <button class="ghost-btn" id="customBackgroundBtn" type="button">Eigenes Hintergrundbild</button>
+            <button class="ghost-btn hidden" id="removeCustomBackgroundBtn" type="button">Eigenen Hintergrund entfernen</button>
+            <button class="ghost-btn" id="resetLayoutBtn" type="button">Start-Layout zurücksetzen</button>
+            <button class="ghost-btn" id="addGoalBtn" type="button">＋ Neue Kachel hinzufügen</button>
+          </div>
+          <div class="emoji-tool">
+            <div class="tool-label"><strong>Emoji hinzufügen</strong><small>Wird im Bearbeitungsmodus frei verschiebbar.</small></div>
+            <div class="emoji-palette" id="emojiPalette">
+              <button type="button" data-emoji="📍">📍</button><button type="button" data-emoji="✈️">✈️</button><button type="button" data-emoji="🚆">🚆</button><button type="button" data-emoji="🚗">🚗</button><button type="button" data-emoji="🥾">🥾</button><button type="button" data-emoji="⛰️">⛰️</button><button type="button" data-emoji="🎉">🎉</button><button type="button" data-emoji="🎂">🎂</button><button type="button" data-emoji="❤️">❤️</button><button type="button" data-emoji="⭐">⭐</button><button type="button" data-emoji="☀️">☀️</button><button type="button" data-emoji="🌿">🌿</button>
+            </div>
+            <div class="custom-emoji-row"><input id="customEmojiInput" maxlength="8" placeholder="Eigenes Emoji"><button class="ghost-btn" id="addCustomEmojiBtn" type="button">Hinzufügen</button></div>
+          </div>
+        </div>
+
+        <div class="popover-panel action-panel hidden" id="actionPanel" role="dialog" aria-label="Tracker-Menü">
+          <div class="popover-head"><strong>Tracker-Menü</strong><button class="mini-close" id="actionCloseBtn" type="button" aria-label="Menü schließen">×</button></div>
+          <div class="action-grid"><button class="ghost-btn" id="saveBtn" type="button">Speichern</button><button class="primary-btn" id="finishBtn" type="button">Tracker abschließen</button></div>
+          <div class="complete-actions hidden" id="completeActions">
+            <button class="ghost-btn" id="previewTripBtn" type="button">Reise ansehen</button>
+            <button class="ghost-btn" id="pdfBtn" type="button">PDF herunterladen</button>
+            <button class="ghost-btn" id="shareFileBtn" type="button">Ansicht teilen</button>
+          </div>
+        </div>
+
+        <div class="tracker-stage" id="trackerStage">
+          <article class="tracker-board" id="trackerBoard">
+            <div class="board-overlay"></div>
+            <svg class="journey-path" id="journeyPath" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true"></svg>
+            <div class="board-heading"><span id="boardBadge">REISE</span><h2 id="boardTitle">Unser Abenteuer</h2></div>
+            <div class="goals-canvas" id="goalsCanvas"></div>
+            <div class="decorations-canvas" id="decorationsCanvas"></div>
+            <footer class="board-footer">Travel Tracker · Erinnerungen, die bleiben</footer>
+          </article>
         </div>
       </div>
-
-      <div class="complete-actions hidden" id="completeActions"><div><strong>Tracker abgeschlossen</strong><span>Öffne die Reise direkt im Viewer, erstelle eine PDF oder teile eine Präsentationsdatei.</span></div><button class="ghost-btn" id="previewTripBtn" type="button">Reise ansehen</button><button class="ghost-btn" id="pdfBtn" type="button">PDF herunterladen</button><button class="ghost-btn" id="shareFileBtn" type="button">Ansicht teilen</button></div>
-
-      <article class="tracker-board" id="trackerBoard">
-        <div class="board-overlay"></div>
-        <svg class="journey-path" id="journeyPath" viewBox="0 0 1000 1414" preserveAspectRatio="none" aria-hidden="true"></svg>
-        <div class="board-heading"><span id="boardBadge">REISE</span><h2 id="boardTitle">Unser Abenteuer</h2><p>Tippe auf ein Ziel, um Namen, Foto und Informationen hinzuzufügen.</p></div>
-        <div class="goals-canvas" id="goalsCanvas"></div>
-        <footer class="board-footer">Travel Tracker · Erinnerungen, die bleiben</footer>
-      </article>
     </section>
   </main>
 </div>
@@ -112,79 +138,92 @@
 <input class="visually-hidden" id="cameraPicker" type="file" accept="image/*" capture="environment">
 <input class="visually-hidden" id="photoPicker" type="file" accept="image/*">
 <input class="visually-hidden" id="importPicker" type="file" accept=".traveltracker,.json,application/json">
+<input class="visually-hidden" id="backgroundPicker" type="file" accept="image/*">
 
-<dialog id="goalDialog">
-  <form method="dialog" class="dialog-card" id="goalForm">
-    <div class="dialog-head"><div><span class="eyebrow">ZIEL BEARBEITEN</span><h2 id="dialogTitle">Ziel 1</h2></div><button class="icon-btn" value="cancel" type="submit">×</button></div>
-    <div class="photo-preview" id="dialogPhotoPreview"><span>Noch kein Foto</span></div>
-    <div class="photo-action-grid"><button class="primary-btn" id="takePhotoBtn" type="button"><span><strong>Foto machen</strong><small>Kamera öffnen und direkt aufnehmen</small></span></button><button class="ghost-btn" id="choosePhotoBtn" type="button"><span><strong>Foto auswählen</strong><small>Aus Fotos oder Dateien auswählen</small></span></button></div>
-    <button class="text-danger-btn" id="removePhotoBtn" type="button">Foto entfernen</button>
-    <label class="field-label">Was war das Ziel?<input id="goalNameInput" type="text" maxlength="70" placeholder="z. B. Kölner Dom"></label>
-    <label class="field-label">Zeitpunkt<input id="goalTimeInput" type="datetime-local"></label>
-    <label class="field-label">Informationstext (optional)<textarea id="goalInfoInput" maxlength="800" rows="4" placeholder="Was ist hier passiert? Was möchtest du zu diesem Moment festhalten?"></textarea></label>
-    <section class="maps-box">
-      <div class="maps-head">
-        <div><span class="eyebrow">ORT</span><strong>Ort zur Station hinzufügen</strong></div>
-        <span class="maps-badge">Karte</span>
-      </div>
-      <p class="maps-copy">Wähle den Ort direkt auf einer Karte aus. Du kannst zum Beispiel nach <strong>„Kölner Dom“</strong> suchen oder einen Punkt auf der Karte antippen.</p>
-      <div class="selected-place" id="selectedPlaceSummary">
-        <span class="selected-place-icon">⌖</span>
-        <div><strong>Noch kein Ort ausgewählt</strong><small>Der Ort ist optional.</small></div>
-      </div>
-      <div class="maps-actions">
-        <button class="ghost-btn" id="pickPlaceBtn" type="button">Ort auswählen</button>
-        <button class="text-danger-btn hidden" id="removePlaceBtn" type="button">Ort entfernen</button>
-      </div>
-    </section>
+<dialog id="goalDialog" aria-labelledby="goalEditorHeading">
+  <div class="goal-editor-shell">
+    <header class="goal-editor-head">
+      <div><span class="eyebrow">ZIEL BEARBEITEN</span><h2 id="goalEditorHeading">Ziel bearbeiten</h2></div>
+      <button class="icon-btn" id="goalDialogCloseBtn" type="button" aria-label="Schließen">×</button>
+    </header>
 
-    <button class="save-btn" id="saveGoalBtn" value="default" type="submit">Übernehmen</button>
-  </form>
+    <div class="goal-editor-body">
+      <div class="photo-editor-block">
+        <div class="photo-preview" id="dialogPhotoPreview"><span>Noch kein Foto</span></div>
+        <div class="photo-action-grid">
+          <button class="primary-btn" id="takePhotoBtn" type="button"><strong>Foto machen</strong><small>Kamera öffnen</small></button>
+          <button class="ghost-btn" id="choosePhotoBtn" type="button"><strong>Foto auswählen</strong><small>Fotos oder Dateien</small></button>
+        </div>
+        <button class="text-danger-btn hidden" id="removePhotoBtn" type="button">Foto entfernen</button>
+      </div>
+
+      <div class="goal-fields-block">
+        <div class="title-style-row">
+          <label class="field-label title-field">Was war das Ziel?<input id="goalNameInput" type="text" maxlength="70" placeholder="z. B. Kölner Dom"></label>
+          <div class="title-tools">
+            <button class="style-tool-btn" id="colorToolBtn" type="button" aria-label="Farben auswählen" title="Farben">🎨</button>
+            <button class="style-tool-btn font-button" id="fontToolBtn" type="button" aria-label="Schriftart auswählen" title="Schriftart">A</button>
+            <div class="mini-style-popover hidden" id="colorPopover">
+              <label>Titelfarbe <input id="titleColorInput" type="color" value="#111827"></label>
+              <label>Infotext <input id="infoColorInput" type="color" value="#344054"></label>
+            </div>
+            <div class="mini-style-popover hidden" id="fontPopover">
+              <button type="button" data-font="system">Modern</button>
+              <button type="button" data-font="serif">Serif</button>
+              <button type="button" data-font="rounded">Rund</button>
+              <button type="button" data-font="hand">Handschrift</button>
+              <button type="button" data-font="mono">Monospace</button>
+            </div>
+          </div>
+        </div>
+        <div class="goal-time-row"><span id="goalTimeDisplay">Zeitpunkt wird beim Foto automatisch erfasst.</span></div>
+        <label class="field-label info-field">Informationstext (optional)<textarea id="goalInfoInput" maxlength="800" rows="3" placeholder="Was ist hier passiert? Was möchtest du zu diesem Moment festhalten?"></textarea></label>
+        <div class="location-editor-row">
+          <div class="selected-place compact-place" id="selectedPlaceSummary"><span class="selected-place-icon">⌖</span><div><strong>Noch kein Ort ausgewählt</strong><small>Der Ort ist optional.</small></div></div>
+          <div class="location-buttons"><button class="ghost-btn" id="pickPlaceBtn" type="button">Ort auswählen</button><button class="text-danger-btn hidden" id="removePlaceBtn" type="button">Ort entfernen</button></div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="goal-editor-footer">
+      <button class="ghost-btn" id="goalCancelBtn" type="button">Abbrechen</button>
+      <button class="primary-btn" id="saveGoalBtn" type="button">Übernehmen</button>
+    </footer>
+  </div>
 </dialog>
 
 <dialog id="mapPickerDialog" aria-labelledby="mapPickerTitle">
-  <div class="dialog-card map-picker-card">
-    <div class="dialog-head map-picker-head">
+  <div class="map-picker-card">
+    <header class="map-picker-head">
       <div><span class="eyebrow">ORT AUSWÄHLEN</span><h2 id="mapPickerTitle">Wo war dieses Ziel?</h2></div>
       <button class="icon-btn" id="mapPickerCloseBtn" type="button" aria-label="Schließen">×</button>
-    </div>
+    </header>
 
-    <div class="map-picker-tools">
-      <p class="dialog-intro">Suche zum Beispiel nach <strong>„Kölner Dom“</strong>, tippe direkt auf die Karte oder springe optional zu deiner aktuellen Position.</p>
+    <section class="map-picker-tools">
       <form class="map-search-form" id="mapSearchForm">
         <label class="field-label map-search-label">Ort suchen
-          <div class="map-search-row">
-            <input id="mapSearchInput" type="search" autocomplete="off" maxlength="140" placeholder="z. B. Kölner Dom, Köln">
-            <button class="primary-btn" type="submit">Suchen</button>
-          </div>
+          <div class="map-search-row"><input id="mapSearchInput" type="search" autocomplete="off" maxlength="140" placeholder="z. B. Kölner Dom, Köln"><button class="primary-btn" type="submit">Suchen</button></div>
         </label>
       </form>
-      <div class="map-tool-row">
-        <button class="ghost-btn map-location-btn" id="mapCurrentLocationBtn" type="button"><span aria-hidden="true">◎</span> Meine Position</button>
-        <small>Nur auf deinen ausdrücklichen Tipp; gespeichert wird erst mit „Diesen Ort übernehmen“.</small>
-      </div>
+      <button class="ghost-btn map-location-btn" id="mapCurrentLocationBtn" type="button"><span aria-hidden="true">◎</span> Meine Position</button>
       <div class="map-search-status" id="mapSearchStatus" aria-live="polite"></div>
+    </section>
+
+    <section class="map-picker-content">
+      <div class="map-empty-state" id="mapEmptyState"><span>⌖</span><strong>Noch kein Ort ausgewählt</strong><small>Suche oben nach einem Ort oder springe zu deiner aktuellen Position.</small></div>
       <div class="map-search-results hidden" id="mapSearchResults"></div>
-    </div>
+      <div class="map-picker-map-wrap hidden" id="mapPickerMapWrap"><div class="map-picker-map" id="mapPickerMap" aria-label="Interaktive Karte zur Ortsauswahl"></div></div>
+    </section>
 
-    <div class="map-picker-map-wrap">
-      <div class="map-picker-map" id="mapPickerMap" aria-label="Interaktive Karte zur Ortsauswahl"></div>
-    </div>
+    <div class="map-selected-panel" id="mapSelectedPanel"><span class="map-selected-pin">⌖</span><div><strong id="mapSelectedTitle">Noch kein Punkt ausgewählt</strong><small id="mapSelectedDetail">Wähle zuerst einen Suchtreffer oder deine Position.</small></div></div>
 
-    <div class="map-selected-panel" id="mapSelectedPanel">
-      <span class="map-selected-pin">⌖</span>
-      <div><strong id="mapSelectedTitle">Noch kein Punkt ausgewählt</strong><small id="mapSelectedDetail">Suche einen Ort oder tippe auf die Karte.</small></div>
-    </div>
-
-    <div class="dialog-actions map-picker-actions">
-      <button class="ghost-btn" id="mapPickerCancelBtn" type="button">Abbrechen</button>
-      <button class="primary-btn" id="mapPickerApplyBtn" type="button" disabled>Diesen Ort übernehmen</button>
-    </div>
+    <footer class="map-picker-actions"><button class="ghost-btn" id="mapPickerCancelBtn" type="button">Abbrechen</button><button class="primary-btn" id="mapPickerApplyBtn" type="button" disabled>Diesen Ort übernehmen</button></footer>
   </div>
 </dialog>
 
 <dialog id="confirmDialog"><form method="dialog" class="dialog-card confirm-card"><h2 id="confirmTitle">Tracker löschen?</h2><p id="confirmText">Diese Aktion kann nicht rückgängig gemacht werden.</p><div class="dialog-actions"><button class="ghost-btn" value="cancel">Abbrechen</button><button class="danger-btn" id="confirmActionBtn" value="default">Löschen</button></div></form></dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="core.js"></script>
 <script src="app.js"></script>

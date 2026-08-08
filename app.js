@@ -3,1356 +3,342 @@
 
   const Core = window.TravelTrackerCore;
   if (!Core) throw new Error('TravelTrackerCore wurde nicht geladen.');
-
-  const {
-    db,
-    createId,
-    escapeHtml,
-    deepClone,
-    readAsDataURL,
-    nowLocalDateTimeInput,
-    toLocalDateTimeInput,
-    fromLocalDateTimeInput,
-    formatDateTime,
-    mapsCoordinatesUrl,
-    normalizeMapsUrl,
-    slugify,
-    downloadBlob
-  } = Core;
-
-  const CATEGORY_LABELS = Object.freeze({
-    travel: 'Reise',
-    hiking: 'Wandern',
-    birthday: 'Geburtstag'
-  });
-
-  const BACKGROUNDS = Object.freeze({
-    travel: [
-      { id: 'travel-sunset', name: 'Sunset Journey', css: 'linear-gradient(145deg,#14213d 0%,#4f5f8b 36%,#e78b6c 70%,#f2c879 100%)' },
-      { id: 'travel-ocean', name: 'Ocean Route', css: 'linear-gradient(150deg,#09203f 0%,#1b7a9e 43%,#8ac6c5 72%,#eee2b3 100%)' },
-      { id: 'travel-pastel', name: 'Pastel Trip', css: 'linear-gradient(135deg,#6c5b9f 0%,#cf5f91 47%,#dfaa58 100%)' }
-    ],
-    hiking: [
-      { id: 'hiking-forest', name: 'Forest Trail', css: 'linear-gradient(145deg,#173b2d 0%,#426b4f 42%,#8e9d68 72%,#d4c797 100%)' },
-      { id: 'hiking-mountain', name: 'Mountain Air', css: 'linear-gradient(145deg,#40576f 0%,#83a2b5 42%,#bac9bd 68%,#d7c08b 100%)' },
-      { id: 'hiking-earth', name: 'Earth Walk', css: 'linear-gradient(140deg,#4b3c2d 0%,#806648 43%,#a79362 67%,#687c63 100%)' }
-    ],
-    birthday: [
-      { id: 'birthday-balloons', name: 'Ballon-Party', css: "url('assets/birthday-balloons.png') center/cover no-repeat" },
-      { id: 'birthday-neon', name: 'Neon Party', css: 'linear-gradient(135deg,#352058 0%,#8d3a95 40%,#e05c81 70%,#f3aa5c 100%)' },
-      { id: 'birthday-confetti', name: 'Konfetti', css: 'linear-gradient(145deg,#4f52c7 0%,#8b65d6 34%,#e76a9d 68%,#f4be67 100%)' }
-    ]
-  });
-
-  const LAYOUTS = Object.freeze({
-    zigzag: { name: 'Zickzack', desc: 'Klassischer Reiseweg mit abwechselnden Stationen' },
-    flow: { name: 'Fließend', desc: 'Ruhiger Verlauf mit weichen Abständen' },
-    collage: { name: 'Collage', desc: 'Lebendiger und etwas verspielter' }
-  });
-
+  const { db, createId, escapeHtml, readAsDataURL, formatDateTime, mapsCoordinatesUrl, slugify, downloadBlob } = Core;
   const $ = id => document.getElementById(id);
   const screens = [...document.querySelectorAll('.screen')];
 
+  const CATEGORY_LABELS = Object.freeze({ travel:'Reise', hiking:'Wandern', birthday:'Geburtstag' });
+  const BACKGROUNDS = Object.freeze({
+    travel:[
+      {id:'travel-sunset',name:'Sunset Journey',css:'linear-gradient(145deg,#14213d 0%,#4f5f8b 36%,#e78b6c 70%,#f2c879 100%)'},
+      {id:'travel-ocean',name:'Ocean Route',css:'linear-gradient(150deg,#09203f 0%,#1b7a9e 43%,#8ac6c5 72%,#eee2b3 100%)'},
+      {id:'travel-pastel',name:'Pastel Trip',css:'linear-gradient(135deg,#6c5b9f 0%,#cf5f91 47%,#dfaa58 100%)'}
+    ],
+    hiking:[
+      {id:'hiking-forest',name:'Forest Trail',css:'linear-gradient(145deg,#173b2d 0%,#426b4f 42%,#8e9d68 72%,#d4c797 100%)'},
+      {id:'hiking-mountain',name:'Mountain Air',css:'linear-gradient(145deg,#40576f 0%,#83a2b5 42%,#bac9bd 68%,#d7c08b 100%)'},
+      {id:'hiking-earth',name:'Earth Walk',css:'linear-gradient(140deg,#4b3c2d 0%,#806648 43%,#a79362 67%,#687c63 100%)'}
+    ],
+    birthday:[
+      {id:'birthday-balloons',name:'Ballon-Party',css:"url('assets/birthday-balloons.png') center/cover no-repeat"},
+      {id:'birthday-neon',name:'Neon Party',css:'linear-gradient(135deg,#352058 0%,#8d3a95 40%,#e05c81 70%,#f3aa5c 100%)'},
+      {id:'birthday-confetti',name:'Konfetti',css:'linear-gradient(145deg,#4f52c7 0%,#8b65d6 34%,#e76a9d 68%,#f4be67 100%)'}
+    ]
+  });
+  const FONT_STACKS = Object.freeze({
+    system:'Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
+    serif:'Georgia,"Times New Roman",serif',
+    rounded:'"Trebuchet MS","Arial Rounded MT Bold",Arial,sans-serif',
+    hand:'"Segoe Print","Bradley Hand","Comic Sans MS",cursive',
+    mono:'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace'
+  });
+
   const state = {
-    currentTrip: null,
-    editGoalIndex: -1,
-    selectedGoalIndex: -1,
-    layoutMode: false,
-    confirmAction: null,
-    dragFinishedAt: 0,
-    viewerAssetsPromise: null,
-    goalDraftLocation: null,
-    mapDraftLocation: null,
-    mapInstance: null,
-    mapMarker: null,
-    geocodeController: null,
-    lastGeocodeAt: 0,
-    wizard: createInitialWizard()
+    currentTrip:null,
+    editMode:false,
+    selectedGoalId:null,
+    selectedDecorationId:null,
+    editGoalIndex:-1,
+    goalDraft:null,
+    goalDraftLocation:null,
+    confirmAction:null,
+    wizard:createInitialWizard(),
+    pointerSession:null,
+    dragFinishedAt:0,
+    viewerAssetsPromise:null,
+    mapDraftLocation:null,
+    mapInstance:null,
+    mapMarker:null,
+    geocodeController:null,
+    lastGeocodeAt:0
   };
 
-  function createInitialWizard() {
-    return {
-      category: 'travel',
-      background: null,
-      title: '',
-      people: 1,
-      participants: [''],
-      goalCount: 6,
-      layout: 'zigzag'
-    };
-  }
+  function createInitialWizard(){return{category:'travel',background:null,title:'',people:1,participants:['']};}
+  function categoryLabel(category){return CATEGORY_LABELS[category]||'Tracker';}
+  function backgroundFor(category,id){const list=BACKGROUNDS[category]||BACKGROUNDS.travel;return list.find(item=>item.id===id)||list[0];}
+  function clamp(value,min,max){return Math.max(min,Math.min(max,value));}
+  function clone(value){return value==null?value:JSON.parse(JSON.stringify(value));}
+  function boardBackground(trip){return trip?.customBackground?`url("${trip.customBackground}") center/cover no-repeat`:(trip?.backgroundCss||backgroundFor(trip?.category,'').css);}
 
-  function categoryLabel(category) {
-    return CATEGORY_LABELS[category] || 'Tracker';
+  function defaultPosition(index,count){
+    if(count===1)return{x:50,y:52,width:34,rotation:0};
+    const columns=count<=3?1:2;
+    const rows=Math.ceil(count/columns);
+    const row=Math.floor(index/columns);
+    const col=index%columns;
+    const x=columns===1?50:(col===0?31:69);
+    const top=rows<=2?34:26;
+    const bottom=rows<=2?68:78;
+    const y=rows===1?52:top+(bottom-top)*(row/(rows-1));
+    return{x,y,width:columns===1?36:28,rotation:index%2===0?-2:2};
   }
-
-  function backgroundFor(category, id) {
-    const items = BACKGROUNDS[category] || BACKGROUNDS.travel;
-    return items.find(item => item.id === id) || items[0];
+  function defaultPositions(count){return Array.from({length:count},(_,index)=>defaultPosition(index,count));}
+  function newGoal(index,position=defaultPosition(index,index+1)){
+    return{id:createId(),name:`Ziel ${index+1}`,info:'',capturedAt:null,photo:null,location:null,x:position.x,y:position.y,width:position.width,rotation:position.rotation,titleColor:'#111827',infoColor:'#344054',fontKey:'system'};
   }
-
-  function presetPositions(count, layout = 'zigzag') {
-    const presets = {
-      zigzag: [[24,23,-5],[72,29,5],[35,43,-2],[70,52,4],[25,66,-4],[63,72,3],[32,82,-3],[74,84,4],[43,91,-2],[69,92,2]],
-      flow: [[26,24,-2],[64,31,3],[39,42,-2],[69,50,2],[31,60,-3],[66,67,2],[37,76,-2],[71,82,2],[43,89,-1],[70,91,1]],
-      collage: [[26,24,-7],[69,27,7],[38,41,3],[72,49,-5],[25,60,6],[63,66,-2],[34,76,-6],[72,81,5],[44,89,3],[70,91,-3]]
-    };
-    const source = presets[layout] || presets.zigzag;
-    return source.slice(0, count).map(([x, y, rotation]) => ({
-      x,
-      y,
-      rotation,
-      entrySide: 'auto',
-      exitSide: 'auto'
+  function normalizeLocation(location){
+    if(!location||typeof location!=='object')return null;
+    const latitude=Number(location.latitude??location.lat),longitude=Number(location.longitude??location.lng);
+    if(!Number.isFinite(latitude)||!Number.isFinite(longitude))return null;
+    return{label:String(location.label||'Ausgewählter Ort').trim()||'Ausgewählter Ort',latitude,longitude};
+  }
+  function normalizeTrip(rawTrip){
+    if(!rawTrip||typeof rawTrip!=='object')return null;
+    const category=CATEGORY_LABELS[rawTrip.category]?rawTrip.category:'travel';
+    const fallback=backgroundFor(category,rawTrip.backgroundId);
+    const rawGoals=Array.isArray(rawTrip.goals)?rawTrip.goals.slice(0,10):[];
+    const count=Math.max(1,rawGoals.length||1);
+    const positions=defaultPositions(count);
+    const goals=Array.from({length:count},(_,index)=>{
+      const raw=rawGoals[index]||{},preset=positions[index];
+      return{
+        id:raw.id||createId(),
+        name:String(raw.name||`Ziel ${index+1}`).trim()||`Ziel ${index+1}`,
+        info:String(raw.info||''),
+        capturedAt:raw.capturedAt||null,
+        photo:typeof raw.photo==='string'&&/^data:image\//i.test(raw.photo)?raw.photo:null,
+        location:normalizeLocation(raw.location),
+        x:clamp(Number.isFinite(Number(raw.x))?Number(raw.x):preset.x,5,95),
+        y:clamp(Number.isFinite(Number(raw.y))?Number(raw.y):preset.y,7,93),
+        width:clamp(Number.isFinite(Number(raw.width))?Number(raw.width):preset.width,14,58),
+        rotation:clamp(Number.isFinite(Number(raw.rotation))?Number(raw.rotation):preset.rotation,-45,45),
+        titleColor:/^#[0-9a-f]{6}$/i.test(raw.titleColor||'')?raw.titleColor:'#111827',
+        infoColor:/^#[0-9a-f]{6}$/i.test(raw.infoColor||'')?raw.infoColor:'#344054',
+        fontKey:FONT_STACKS[raw.fontKey]?raw.fontKey:'system'
+      };
+    });
+    const decorations=(Array.isArray(rawTrip.decorations)?rawTrip.decorations:[]).slice(0,40).map((raw,index)=>({
+      id:raw.id||createId(),emoji:String(raw.emoji||'⭐').slice(0,8),x:clamp(Number(raw.x)||50,3,97),y:clamp(Number(raw.y)||50,4,96),size:clamp(Number(raw.size)||42,20,92),rotation:clamp(Number(raw.rotation)||0,-180,180)
     }));
-  }
-
-  function normalizeLocation(location) {
-    if (!location || typeof location !== 'object') return null;
-
-    const label = String(location.label || '').trim();
-    const rawMapsUrl = String(location.mapsUrl || '').trim();
-    const latitude = Number(location.latitude ?? location.lat);
-    const longitude = Number(location.longitude ?? location.lng);
-    const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude);
-
-    if (!label && !rawMapsUrl && !hasCoordinates) return null;
-
-    return {
-      label: label || 'Ausgewählter Ort',
-      latitude: hasCoordinates ? latitude : null,
-      longitude: hasCoordinates ? longitude : null,
-      mapsUrl: hasCoordinates
-        ? mapsCoordinatesUrl(latitude, longitude)
-        : normalizeMapsUrl(rawMapsUrl, label)
+    const customBackground=typeof rawTrip.customBackground==='string'&&/^data:image\//i.test(rawTrip.customBackground)?rawTrip.customBackground:null;
+    const cardShape=['rounded','square','circle','polaroid'].includes(rawTrip.cardShape)?rawTrip.cardShape:'rounded';
+    const lineStyle=['dashed','solid','none'].includes(rawTrip.lineStyle)?rawTrip.lineStyle:'dashed';
+    return{
+      id:rawTrip.id||createId(),schemaVersion:6,title:String(rawTrip.title||`${categoryLabel(category)} ${new Date().toLocaleDateString('de-DE')}`).trim(),category,
+      backgroundId:fallback.id,backgroundCss:fallback.css,customBackground,
+      participants:Array.isArray(rawTrip.participants)?rawTrip.participants.map(v=>String(v||'').trim()).filter(Boolean).slice(0,12):[],
+      lineStyle,cardShape,photoOnly:Boolean(rawTrip.photoOnly),decorations,
+      completed:Boolean(rawTrip.completed)&&goals.length>0&&goals.every(goal=>Boolean(goal.photo)),
+      createdAt:rawTrip.createdAt||new Date().toISOString(),updatedAt:rawTrip.updatedAt||rawTrip.createdAt||new Date().toISOString(),goals
     };
   }
 
-  function normalizeTrip(rawTrip) {
-    if (!rawTrip || typeof rawTrip !== 'object') return null;
-
-    const category = CATEGORY_LABELS[rawTrip.category] ? rawTrip.category : 'travel';
-    const layout = LAYOUTS[rawTrip.layout] ? rawTrip.layout : 'zigzag';
-    const rawGoals = Array.isArray(rawTrip.goals) ? rawTrip.goals.slice(0, 10) : [];
-    const goalCount = Math.max(1, rawGoals.length || 1);
-    const positions = presetPositions(goalCount, layout);
-    const categoryBackgrounds = BACKGROUNDS[category] || BACKGROUNDS.travel;
-    const fallbackBackground = categoryBackgrounds.find(item => item.id === rawTrip.backgroundId)
-      || categoryBackgrounds.find(item => item.css === rawTrip.backgroundCss)
-      || categoryBackgrounds[0];
-
-    const goals = Array.from({ length: goalCount }, (_, index) => {
-      const rawGoal = rawGoals[index] || {};
-      const preset = positions[index] || { x: 50, y: 50, rotation: 0, entrySide: 'auto', exitSide: 'auto' };
-      const x = Number(rawGoal.x);
-      const y = Number(rawGoal.y);
-      const rotation = Number(rawGoal.rotation);
-
-      return {
-        id: rawGoal.id || createId(),
-        name: String(rawGoal.name || `Ziel ${index + 1}`).trim() || `Ziel ${index + 1}`,
-        info: String(rawGoal.info || ''),
-        capturedAt: rawGoal.capturedAt || null,
-        photo: typeof rawGoal.photo === 'string' && /^data:image\//i.test(rawGoal.photo) ? rawGoal.photo : null,
-        location: normalizeLocation(rawGoal.location),
-        x: Number.isFinite(x) ? Math.max(16, Math.min(84, x)) : preset.x,
-        y: Number.isFinite(y) ? Math.max(14, Math.min(91, y)) : preset.y,
-        rotation: Number.isFinite(rotation) ? Math.max(-25, Math.min(25, rotation)) : preset.rotation,
-        entrySide: ['auto','top','right','bottom','left'].includes(rawGoal.entrySide) ? rawGoal.entrySide : 'auto',
-        exitSide: ['auto','top','right','bottom','left'].includes(rawGoal.exitSide) ? rawGoal.exitSide : 'auto'
-      };
-    });
-
-    return {
-      ...rawTrip,
-      id: rawTrip.id || createId(),
-      schemaVersion: 5,
-      title: String(rawTrip.title || `${categoryLabel(category)} ${new Date().toLocaleDateString('de-DE')}`).trim(),
-      category,
-      backgroundId: rawTrip.backgroundId || fallbackBackground.id,
-      backgroundCss: fallbackBackground.css,
-      participants: Array.isArray(rawTrip.participants)
-        ? rawTrip.participants.map(value => String(value || '').trim()).filter(Boolean).slice(0, 12)
-        : [],
-      layout,
-      lineStyle: ['dashed','solid','none'].includes(rawTrip.lineStyle) ? rawTrip.lineStyle : 'dashed',
-      completed: Boolean(rawTrip.completed) && goals.every(goal => Boolean(goal.photo)),
-      createdAt: rawTrip.createdAt || new Date().toISOString(),
-      updatedAt: rawTrip.updatedAt || rawTrip.createdAt || new Date().toISOString(),
-      goals
-    };
+  function showScreen(name){
+    const id=`screen${name[0].toUpperCase()}${name.slice(1)}`;
+    screens.forEach(screen=>screen.classList.toggle('active',screen.id===id));
+    const tracker=name==='tracker';
+    document.body.classList.toggle('tracker-active',tracker);
+    $('headerHomeBtn').classList.toggle('hidden',name==='home');
+    closePanels();
+    if(!tracker)window.scrollTo({top:0,behavior:'auto'});
+  }
+  function toast(message){const element=$('toast');element.textContent=message;element.classList.add('show');clearTimeout(element._timer);element._timer=setTimeout(()=>element.classList.remove('show'),2400);}
+  async function saveCurrentTrip(message='Lokal gespeichert'){
+    if(!state.currentTrip)return false;
+    state.currentTrip.updatedAt=new Date().toISOString();
+    try{await db.putTrip(state.currentTrip);updateTrackerStatus(message);return true;}catch(error){console.error(error);updateTrackerStatus('Speichern fehlgeschlagen');toast('Tracker konnte nicht gespeichert werden.');return false;}
+  }
+  function updateTrackerStatus(message='Lokal gespeichert'){
+    if(!state.currentTrip)return;
+    const filled=state.currentTrip.goals.filter(goal=>goal.photo).length;
+    $('saveState').textContent=`${filled}/${state.currentTrip.goals.length} Erinnerungen · ${message}`;
+    $('completeActions').classList.toggle('hidden',!state.currentTrip.completed);
+    $('finishBtn').textContent=state.currentTrip.completed?'Tracker erneut abschließen':'Tracker abschließen';
   }
 
-
-  function showScreen(name) {
-    const targetId = `screen${name[0].toUpperCase()}${name.slice(1)}`;
-    screens.forEach(screen => screen.classList.toggle('active', screen.id === targetId));
-    window.scrollTo({ top: 0, behavior: 'auto' });
+  async function refreshHome(){
+    try{
+      const trips=(await db.getAllTrips()).map(normalizeTrip).filter(Boolean).sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0));
+      $('libraryCount').textContent=trips.length?`${trips.length} gespeicherte${trips.length===1?'r Tracker':' Tracker'}`:'Noch keine gespeicherten Tracker';
+      renderTripCards($('recentTrips'),trips.slice(0,3));renderTripCards($('tripLibrary'),trips);
+    }catch(error){console.error(error);toast('Gespeicherte Tracker konnten nicht geladen werden.');}
   }
-
-  function toast(message) {
-    const element = $('toast');
-    element.textContent = message;
-    element.classList.add('show');
-    clearTimeout(element._timer);
-    element._timer = setTimeout(() => element.classList.remove('show'), 2400);
-  }
-
-  async function saveCurrentTrip(message = 'Lokal gespeichert') {
-    if (!state.currentTrip) return false;
-    state.currentTrip.updatedAt = new Date().toISOString();
-
-    try {
-      await db.putTrip(state.currentTrip);
-      $('saveState').textContent = message;
-      return true;
-    } catch (error) {
-      console.error(error);
-      $('saveState').textContent = 'Speichern fehlgeschlagen';
-      toast('Tracker konnte nicht gespeichert werden.');
-      return false;
-    }
-  }
-
-  async function refreshHome() {
-    try {
-      const trips = (await db.getAllTrips())
-        .map(normalizeTrip)
-        .filter(Boolean)
-        .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
-
-      $('libraryCount').textContent = trips.length
-        ? `${trips.length} gespeicherte${trips.length === 1 ? 'r Tracker' : ' Tracker'}`
-        : 'Noch keine gespeicherten Tracker';
-
-      renderTripCards($('recentTrips'), trips.slice(0, 3));
-      renderTripCards($('tripLibrary'), trips);
-    } catch (error) {
-      console.error(error);
-      toast('Gespeicherte Tracker konnten nicht geladen werden.');
-    }
-  }
-
-  function renderTripCards(container, trips) {
-    if (!trips.length) {
-      container.innerHTML = '<div class="empty-card">Noch keine Tracker vorhanden.</div>';
-      return;
-    }
-
-    container.innerHTML = trips.map(trip => {
-      const filled = trip.goals.filter(goal => goal.photo).length;
-      const total = trip.goals.length;
-      return `<article class="trip-card" data-trip-id="${escapeHtml(trip.id)}">
-        <button class="delete-mini" type="button" data-action="delete-trip" data-trip-id="${escapeHtml(trip.id)}" aria-label="${escapeHtml(trip.title)} löschen">×</button>
-        <button class="trip-card-main" type="button" data-action="open-trip" data-trip-id="${escapeHtml(trip.id)}">
-          <div class="trip-thumb" style="background:${trip.backgroundCss || '#dbe4ef'}"></div>
-          <div class="trip-card-copy">
-            <strong>${escapeHtml(trip.title || 'Ohne Titel')}</strong>
-            <small>${escapeHtml(categoryLabel(trip.category))} · ${filled}/${total} Ziele${trip.completed ? ' · abgeschlossen' : ''}</small>
-          </div>
-        </button>
-      </article>`;
+  function renderTripCards(container,trips){
+    if(!trips.length){container.innerHTML='<div class="empty-card">Noch keine Tracker vorhanden.</div>';return;}
+    container.innerHTML=trips.map(trip=>{
+      const filled=trip.goals.filter(goal=>goal.photo).length;const bg=trip.customBackground?`url(&quot;${trip.customBackground}&quot;) center/cover no-repeat`:trip.backgroundCss;
+      return`<article class="trip-card"><button class="delete-mini" type="button" data-action="delete-trip" data-trip-id="${escapeHtml(trip.id)}" aria-label="${escapeHtml(trip.title)} löschen">×</button><button class="trip-card-main" type="button" data-action="open-trip" data-trip-id="${escapeHtml(trip.id)}"><div class="trip-thumb" style="background:${bg}"></div><div class="trip-card-copy"><strong>${escapeHtml(trip.title||'Ohne Titel')}</strong><small>${escapeHtml(categoryLabel(trip.category))} · ${filled}/${trip.goals.length} Ziele${trip.completed?' · abgeschlossen':''}</small></div></button></article>`;
     }).join('');
   }
-
-  async function handleTripGridClick(event) {
-    const actionButton = event.target.closest('[data-action][data-trip-id]');
-    if (!actionButton) return;
-
-    const { action, tripId } = actionButton.dataset;
-    if (action === 'open-trip') {
-      await openTrip(tripId);
-      return;
-    }
-
-    if (action === 'delete-trip') {
-      const trip = await db.getTrip(tripId);
-      askConfirm(
-        `„${trip?.title || 'Diese Reise'}“ löschen?`,
-        'Die Reise und alle darin lokal gespeicherten Fotos werden von diesem Gerät gelöscht.',
-        async () => {
-          await db.deleteTrip(tripId);
-          if (state.currentTrip?.id === tripId) state.currentTrip = null;
-          await refreshHome();
-          toast('Reise gelöscht.');
-        }
-      );
+  async function handleTripGridClick(event){
+    const button=event.target.closest('[data-action][data-trip-id]');if(!button)return;
+    if(button.dataset.action==='open-trip'){await openTrip(button.dataset.tripId);return;}
+    if(button.dataset.action==='delete-trip'){
+      const trip=await db.getTrip(button.dataset.tripId);
+      askConfirm(`„${trip?.title||'Diese Reise'}“ löschen?`,'Die Reise und alle darin lokal gespeicherten Fotos werden von diesem Gerät gelöscht.',async()=>{await db.deleteTrip(button.dataset.tripId);if(state.currentTrip?.id===button.dataset.tripId)state.currentTrip=null;await refreshHome();toast('Reise gelöscht.');});
     }
   }
+  function askConfirm(title,text,callback){$('confirmTitle').textContent=title;$('confirmText').textContent=text;state.confirmAction=callback;$('confirmDialog').showModal();}
 
-  function askConfirm(title, text, callback) {
-    $('confirmTitle').textContent = title;
-    $('confirmText').textContent = text;
-    state.confirmAction = callback;
-    $('confirmDialog').showModal();
+  function resetWizard(){state.wizard=createInitialWizard();$('projectTitle').value='';$('peopleCount').value='1';renderParticipantFields();}
+  function renderBackgrounds(){const items=BACKGROUNDS[state.wizard.category]||BACKGROUNDS.travel;$('backgroundGrid').innerHTML=items.map(bg=>`<button class="background-card" type="button" data-bg-id="${bg.id}"><div class="background-preview" style="background:${bg.css}"></div><strong>${escapeHtml(bg.name)}</strong><small>Als Hintergrund verwenden</small></button>`).join('');}
+  function renderParticipantFields(){const wizard=state.wizard;wizard.participants=Array.from({length:wizard.people},(_,i)=>wizard.participants[i]||'');$('participantFields').innerHTML=wizard.participants.map((name,index)=>`<label class="field-label">Person ${index+1}<input data-person-index="${index}" maxlength="40" placeholder="Name" value="${escapeHtml(name)}"></label>`).join('');}
+  function adjustPeople(delta){state.wizard.people=clamp(state.wizard.people+delta,1,12);$('peopleCount').value=String(state.wizard.people);renderParticipantFields();}
+  async function createTripFromWizard(){
+    const wizard=state.wizard;wizard.title=$('projectTitle').value.trim();wizard.participants=[...$('participantFields').querySelectorAll('input')].map(i=>i.value.trim());
+    if(!wizard.title){toast('Bitte gib dem Tracker einen Titel.');$('projectTitle').focus();return;}
+    const bg=wizard.background||backgroundFor(wizard.category);const count=4;const positions=defaultPositions(count);const now=new Date().toISOString();
+    state.currentTrip={id:createId(),schemaVersion:6,title:wizard.title,category:wizard.category,backgroundId:bg.id,backgroundCss:bg.css,customBackground:null,participants:wizard.participants.filter(Boolean),lineStyle:'dashed',cardShape:'rounded',photoOnly:false,decorations:[],completed:false,createdAt:now,updatedAt:now,goals:Array.from({length:count},(_,i)=>newGoal(i,positions[i]))};
+    await db.putTrip(state.currentTrip);openTrackerScreen();
   }
 
-  function resetWizard() {
-    state.wizard = createInitialWizard();
-    $('projectTitle').value = '';
-    $('peopleCount').value = '1';
-    $('goalCount').value = '6';
-    renderParticipantFields();
+  async function openTrip(id){try{const raw=await db.getTrip(id);if(!raw){toast('Tracker nicht gefunden.');return;}state.currentTrip=normalizeTrip(raw);await db.putTrip(state.currentTrip);openTrackerScreen();}catch(error){console.error(error);toast('Tracker konnte nicht geöffnet werden.');}}
+  function openTrackerScreen(){
+    if(!state.currentTrip)return;state.editMode=false;state.selectedGoalId=null;state.selectedDecorationId=null;
+    $('trackerCategoryLabel').textContent=categoryLabel(state.currentTrip.category).toUpperCase();$('trackerTitle').textContent=state.currentTrip.title;$('boardBadge').textContent=categoryLabel(state.currentTrip.category).toUpperCase();$('boardTitle').textContent=state.currentTrip.title;
+    $('lineStyleSelect').value=state.currentTrip.lineStyle;$('cardShapeSelect').value=state.currentTrip.cardShape;$('photoOnlyToggle').checked=state.currentTrip.photoOnly;$('removeCustomBackgroundBtn').classList.toggle('hidden',!state.currentTrip.customBackground);
+    $('trackerBoard').style.background=boardBackground(state.currentTrip);$('trackerBoard').classList.remove('edit-mode');$('editModeBtn').classList.remove('active');$('editModeBtn').setAttribute('aria-pressed','false');
+    showScreen('tracker');renderCanvas();updateTrackerStatus();requestAnimationFrame(drawJourneyPath);
   }
 
-  function renderBackgrounds() {
-    const items = BACKGROUNDS[state.wizard.category] || BACKGROUNDS.travel;
-    $('backgroundGrid').innerHTML = items.map(background => `
-      <button class="background-card" type="button" data-bg-id="${background.id}">
-        <div class="background-preview" style="background:${background.css}"></div>
-        <strong>${escapeHtml(background.name)}</strong>
-        <small>Als Hintergrund verwenden</small>
-      </button>`).join('');
-  }
-
-  function renderParticipantFields() {
-    const { wizard } = state;
-    wizard.participants = Array.from({ length: wizard.people }, (_, index) => wizard.participants[index] || '');
-    $('participantFields').innerHTML = wizard.participants.map((name, index) => `
-      <label class="field-label">Person ${index + 1}
-        <input data-person-index="${index}" maxlength="40" placeholder="Name" value="${escapeHtml(name)}">
-      </label>`).join('');
-  }
-
-  function renderLayouts() {
-    $('layoutGrid').innerHTML = Object.entries(LAYOUTS).map(([key, layout]) => {
-      const positions = presetPositions(5, key);
-      const preview = positions.map(position => `
-        <span class="layout-dot" style="left:${position.x}%;top:${position.y}%;transform:translate(-50%,-50%) rotate(${position.rotation}deg)"></span>`).join('');
-      return `<button class="layout-card" data-layout="${key}" type="button">
-        <div class="layout-preview">${preview}</div>
-        <strong>${escapeHtml(layout.name)}</strong>
-        <small>${escapeHtml(layout.desc)}</small>
-      </button>`;
+  function goalFont(goal){return FONT_STACKS[goal.fontKey]||FONT_STACKS.system;}
+  function renderCanvas(){renderGoals();renderDecorations();drawJourneyPath();updateTrackerStatus();}
+  function renderGoals(){
+    const trip=state.currentTrip;if(!trip)return;
+    $('goalsCanvas').innerHTML=trip.goals.map((goal,index)=>{
+      const selected=state.editMode&&state.selectedGoalId===goal.id;const ratio=trip.cardShape==='circle'?'1':'1.24';const date=formatDateTime(goal.capturedAt);const photo=goal.photo?`<img src="${goal.photo}" alt="${escapeHtml(goal.name)}">`:`<span class="goal-placeholder">＋ Foto</span>`;
+      const handles=selected?`<div class="edit-overlay"><button class="tile-delete" data-goal-delete="${goal.id}" type="button" aria-label="Kachel löschen">×</button><button class="rotate-handle" data-rotate-handle="${goal.id}" type="button" aria-label="Kachel drehen">↻</button><span class="resize-handle tl" data-resize-handle="${goal.id}"></span><span class="resize-handle tr" data-resize-handle="${goal.id}"></span><span class="resize-handle bl" data-resize-handle="${goal.id}"></span><span class="resize-handle br" data-resize-handle="${goal.id}"></span></div>`:'';
+      return`<div class="goal-anchor" data-goal-id="${goal.id}" data-goal-index="${index}" style="left:${goal.x}%;top:${goal.y}%;width:${goal.width}%;aspect-ratio:${ratio}"><article class="goal-card shape-${trip.cardShape}${trip.photoOnly?' photo-only':''}${selected?' selected':''}" style="transform:rotate(${goal.rotation}deg);font-family:${goalFont(goal)}"><span class="goal-number">${index+1}</span><div class="goal-photo">${photo}</div>${goal.location?`<span class="goal-location-badge">⌖ ${escapeHtml(goal.location.label)}</span>`:''}<div class="goal-card-meta"><strong style="color:${goal.titleColor}">${escapeHtml(goal.name)}</strong><small>${date||'Antippen zum Bearbeiten'}</small></div></article>${handles}</div>`;
     }).join('');
   }
+  function renderDecorations(){
+    const trip=state.currentTrip;if(!trip)return;
+    $('decorationsCanvas').innerHTML=(trip.decorations||[]).map(item=>{const selected=state.editMode&&state.selectedDecorationId===item.id;return`<div class="decoration${selected?' selected':''}" data-decoration-id="${item.id}" style="left:${item.x}%;top:${item.y}%;--emoji-size:${item.size}px;transform:translate(-50%,-50%) rotate(${item.rotation}deg)">${escapeHtml(item.emoji)}${selected?`<button class="emoji-delete" data-decoration-delete="${item.id}" type="button" aria-label="Emoji löschen">×</button>`:''}</div>`;}).join('');
+  }
+  function drawJourneyPath(){
+    const trip=state.currentTrip,svg=$('journeyPath');if(!trip||trip.lineStyle==='none'||trip.goals.length<2){svg.innerHTML='';return;}
+    const points=trip.goals.map(goal=>({x:goal.x*10,y:goal.y*10}));let d='';for(let i=0;i<points.length-1;i++){const a=points[i],b=points[i+1];const bend=Math.max(45,Math.abs(b.x-a.x)*.38);const c1x=a.x+(b.x>=a.x?bend:-bend),c2x=b.x-(b.x>=a.x?bend:-bend);d+=`M ${a.x} ${a.y} C ${c1x} ${a.y}, ${c2x} ${b.y}, ${b.x} ${b.y} `;}
+    svg.innerHTML=`<path d="${d}" fill="none" stroke="rgba(17,24,39,.70)" stroke-width="4" stroke-linecap="round" ${trip.lineStyle==='dashed'?'stroke-dasharray="15 13"':''}/>`;
+  }
+  function selectGoal(id){state.selectedGoalId=id;state.selectedDecorationId=null;renderGoals();renderDecorations();}
+  function selectDecoration(id){state.selectedDecorationId=id;state.selectedGoalId=null;renderGoals();renderDecorations();}
+  function toggleEditMode(){state.editMode=!state.editMode;state.selectedGoalId=null;state.selectedDecorationId=null;$('trackerBoard').classList.toggle('edit-mode',state.editMode);$('editModeBtn').classList.toggle('active',state.editMode);$('editModeBtn').setAttribute('aria-pressed',String(state.editMode));$('editModeBtn').textContent=state.editMode?'✓ Bearbeitungsmodus aktiv':'✦ Bearbeitungsmodus';renderGoals();renderDecorations();}
 
-  async function createTripFromWizard() {
-    const { wizard } = state;
-    const positions = presetPositions(wizard.goalCount, wizard.layout);
-    const now = new Date().toISOString();
-    const fallbackBackground = backgroundFor(wizard.category, wizard.background?.id);
-
-    state.currentTrip = {
-      id: createId(),
-      schemaVersion: 5,
-      title: wizard.title || `${categoryLabel(wizard.category)} ${new Date().toLocaleDateString('de-DE')}`,
-      category: wizard.category,
-      backgroundId: wizard.background?.id || fallbackBackground.id,
-      backgroundCss: wizard.background?.css || fallbackBackground.css,
-      participants: wizard.participants.map(name => name.trim()).filter(Boolean),
-      layout: wizard.layout,
-      lineStyle: 'dashed',
-      completed: false,
-      createdAt: now,
-      updatedAt: now,
-      goals: Array.from({ length: wizard.goalCount }, (_, index) => ({
-        id: createId(),
-        name: `Ziel ${index + 1}`,
-        info: '',
-        capturedAt: null,
-        photo: null,
-        location: null,
-        ...positions[index]
-      }))
-    };
-
-    await db.putTrip(state.currentTrip);
-    openTrackerScreen();
+  function startPointerSession(event){
+    if(!state.editMode||!state.currentTrip||event.button>0)return;
+    const deleteGoal=event.target.closest('[data-goal-delete]'),deleteEmoji=event.target.closest('[data-decoration-delete]');if(deleteGoal||deleteEmoji)return;
+    const board=$('trackerBoard').getBoundingClientRect();
+    const rotate=event.target.closest('[data-rotate-handle]');if(rotate){const goal=state.currentTrip.goals.find(g=>g.id===rotate.dataset.rotateHandle);const anchor=event.target.closest('.goal-anchor').getBoundingClientRect();const cx=anchor.left+anchor.width/2,cy=anchor.top+anchor.height/2;state.pointerSession={type:'rotate',id:goal.id,cx,cy,startAngle:Math.atan2(event.clientY-cy,event.clientX-cx),startRotation:goal.rotation};selectGoal(goal.id);event.preventDefault();return;}
+    const resize=event.target.closest('[data-resize-handle]');if(resize){const goal=state.currentTrip.goals.find(g=>g.id===resize.dataset.resizeHandle);const anchor=event.target.closest('.goal-anchor').getBoundingClientRect();const cx=anchor.left+anchor.width/2,cy=anchor.top+anchor.height/2;state.pointerSession={type:'resize',id:goal.id,cx,cy,startDist:Math.hypot(event.clientX-cx,event.clientY-cy)||1,startWidth:goal.width};selectGoal(goal.id);event.preventDefault();return;}
+    const decoration=event.target.closest('[data-decoration-id]');if(decoration){const item=state.currentTrip.decorations.find(d=>d.id===decoration.dataset.decorationId);if(!item)return;state.pointerSession={type:'emoji',id:item.id,startX:event.clientX,startY:event.clientY,startItem:{x:item.x,y:item.y},board};selectDecoration(item.id);event.preventDefault();return;}
+    const anchor=event.target.closest('[data-goal-id]');if(anchor){const goal=state.currentTrip.goals.find(g=>g.id===anchor.dataset.goalId);if(!goal)return;state.pointerSession={type:'move',id:goal.id,startX:event.clientX,startY:event.clientY,startGoal:{x:goal.x,y:goal.y},board};selectGoal(goal.id);event.preventDefault();}
+  }
+  function handlePointerMove(event){
+    const session=state.pointerSession;if(!session||!state.currentTrip)return;
+    if(session.type==='move'){const goal=state.currentTrip.goals.find(g=>g.id===session.id);if(!goal)return;const dx=(event.clientX-session.startX)/session.board.width*100,dy=(event.clientY-session.startY)/session.board.height*100;goal.x=clamp(session.startGoal.x+dx,3,97);goal.y=clamp(session.startGoal.y+dy,4,96);renderGoals();drawJourneyPath();}
+    if(session.type==='emoji'){const item=state.currentTrip.decorations.find(d=>d.id===session.id);if(!item)return;item.x=clamp(session.startItem.x+(event.clientX-session.startX)/session.board.width*100,2,98);item.y=clamp(session.startItem.y+(event.clientY-session.startY)/session.board.height*100,3,97);renderDecorations();}
+    if(session.type==='resize'){const goal=state.currentTrip.goals.find(g=>g.id===session.id);if(!goal)return;const dist=Math.hypot(event.clientX-session.cx,event.clientY-session.cy);goal.width=clamp(session.startWidth*(dist/session.startDist),14,58);renderGoals();drawJourneyPath();}
+    if(session.type==='rotate'){const goal=state.currentTrip.goals.find(g=>g.id===session.id);if(!goal)return;const angle=Math.atan2(event.clientY-session.cy,event.clientX-session.cx);goal.rotation=clamp(session.startRotation+(angle-session.startAngle)*180/Math.PI,-45,45);renderGoals();}
+  }
+  function endPointerSession(){if(!state.pointerSession)return;state.pointerSession=null;state.dragFinishedAt=Date.now();void saveCurrentTrip();}
+  function handleCanvasClick(event){
+    const deleteButton=event.target.closest('[data-goal-delete]');if(deleteButton){const goal=state.currentTrip?.goals.find(g=>g.id===deleteButton.dataset.goalDelete);if(!goal)return;if(state.currentTrip.goals.length<=1){toast('Mindestens eine Kachel muss erhalten bleiben.');return;}askConfirm(`„${goal.name}“ löschen?`,'Die Kachel und ihr Foto werden aus diesem Tracker entfernt.',async()=>{state.currentTrip.goals=state.currentTrip.goals.filter(g=>g.id!==goal.id);state.currentTrip.completed=false;state.selectedGoalId=null;await saveCurrentTrip();renderCanvas();});return;}
+    const emojiDelete=event.target.closest('[data-decoration-delete]');if(emojiDelete){state.currentTrip.decorations=state.currentTrip.decorations.filter(d=>d.id!==emojiDelete.dataset.decorationDelete);state.selectedDecorationId=null;renderDecorations();void saveCurrentTrip();return;}
+    if(Date.now()-state.dragFinishedAt<220)return;
+    const anchor=event.target.closest('[data-goal-id]');if(anchor){if(state.editMode){selectGoal(anchor.dataset.goalId);return;}openGoalDialog(Number(anchor.dataset.goalIndex));return;}
+    const deco=event.target.closest('[data-decoration-id]');if(deco&&state.editMode){selectDecoration(deco.dataset.decorationId);return;}
+    if(state.editMode){state.selectedGoalId=null;state.selectedDecorationId=null;renderGoals();renderDecorations();}
   }
 
-  async function openTrip(id) {
-    try {
-      const rawTrip = await db.getTrip(id);
-      if (!rawTrip) {
-        toast('Tracker nicht gefunden.');
-        return;
-      }
+  function openGoalDialog(index){
+    const goal=state.currentTrip?.goals[index];if(!goal)return;state.editGoalIndex=index;state.goalDraft=clone(goal);state.goalDraftLocation=clone(goal.location);$('goalEditorHeading').textContent=`Ziel ${index+1} bearbeiten`;$('goalNameInput').value=goal.name;$('goalInfoInput').value=goal.info||'';$('titleColorInput').value=goal.titleColor||'#111827';$('infoColorInput').value=goal.infoColor||'#344054';renderGoalDraft();setModalLock(true);$('goalDialog').showModal();
+  }
+  function renderGoalDraft(){
+    const draft=state.goalDraft;if(!draft)return;
+    $('dialogPhotoPreview').innerHTML=draft.photo?`<img src="${draft.photo}" alt="Vorschau">`:'<span>Noch kein Foto</span>';$('removePhotoBtn').classList.toggle('hidden',!draft.photo);$('goalTimeDisplay').textContent=draft.capturedAt?formatDateTime(draft.capturedAt):'Zeitpunkt wird beim Foto automatisch erfasst.';$('goalNameInput').style.color=draft.titleColor||'#111827';$('goalNameInput').style.fontFamily=goalFont(draft);$('goalInfoInput').style.color=draft.infoColor||'#344054';renderSelectedPlaceSummary();
+  }
+  async function applyPickedPhoto(file){if(!file||!state.goalDraft)return;if(!file.type.startsWith('image/')){toast('Bitte wähle eine Bilddatei.');return;}try{state.goalDraft.photo=await readAsDataURL(file);state.goalDraft.capturedAt=new Date().toISOString();renderGoalDraft();}catch(error){console.error(error);toast('Foto konnte nicht geladen werden.');}}
+  function removeDraftPhoto(){if(!state.goalDraft)return;state.goalDraft.photo=null;state.goalDraft.capturedAt=null;renderGoalDraft();}
+  async function saveGoalFromDialog(){
+    if(state.editGoalIndex<0||!state.currentTrip||!state.goalDraft)return;const goal=state.currentTrip.goals[state.editGoalIndex];const draft=state.goalDraft;goal.name=$('goalNameInput').value.trim()||`Ziel ${state.editGoalIndex+1}`;goal.info=$('goalInfoInput').value.trim();goal.photo=draft.photo||null;goal.capturedAt=draft.capturedAt||null;goal.location=normalizeLocation(state.goalDraftLocation);goal.titleColor=draft.titleColor;goal.infoColor=draft.infoColor;goal.fontKey=draft.fontKey;if(!goal.photo)state.currentTrip.completed=false;await saveCurrentTrip();renderCanvas();closeGoalDialog();
+  }
+  function closeGoalDialog(){if($('goalDialog').open)$('goalDialog').close();state.editGoalIndex=-1;state.goalDraft=null;state.goalDraftLocation=null;closeStylePopovers();setModalLock(false);}
+  function closeStylePopovers(){$('colorPopover').classList.add('hidden');$('fontPopover').classList.add('hidden');}
+  function toggleStylePopover(which){const target=$(which);const other=which==='colorPopover'?$('fontPopover'):$('colorPopover');other.classList.add('hidden');target.classList.toggle('hidden');}
+  function renderSelectedPlaceSummary(){
+    const location=state.goalDraftLocation,el=$('selectedPlaceSummary');if(!location){el.innerHTML='<span class="selected-place-icon">⌖</span><div><strong>Noch kein Ort ausgewählt</strong><small>Der Ort ist optional.</small></div>';$('removePlaceBtn').classList.add('hidden');return;}el.innerHTML=`<span class="selected-place-icon active">⌖</span><div><strong>${escapeHtml(location.label)}</strong><small>Ort ist mit dieser Station verknüpft.</small></div>`;$('removePlaceBtn').classList.remove('hidden');
+  }
+  function setModalLock(locked){document.documentElement.classList.toggle('modal-open',locked);document.body.classList.toggle('modal-open',locked);}
 
-      state.currentTrip = normalizeTrip(rawTrip);
-      await db.putTrip(state.currentTrip); // Persists schema cleanup/migration once.
-      openTrackerScreen();
-    } catch (error) {
-      console.error(error);
-      toast('Tracker konnte nicht geöffnet werden.');
-    }
+  async function waitForGeocodeSlot(){const wait=Math.max(0,1050-(Date.now()-state.lastGeocodeAt));if(wait)await new Promise(resolve=>setTimeout(resolve,wait));state.lastGeocodeAt=Date.now();}
+  async function requestNominatim(path,params){await waitForGeocodeSlot();state.geocodeController?.abort();state.geocodeController=new AbortController();const query=new URLSearchParams({...params,format:'jsonv2','accept-language':'de'});const response=await fetch(`https://nominatim.openstreetmap.org/${path}?${query}`,{headers:{Accept:'application/json'},signal:state.geocodeController.signal});if(!response.ok)throw new Error(`Kartensuche fehlgeschlagen (${response.status})`);return response.json();}
+  function shortPlaceLabel(result){const a=result.address||{};return result.name||a.attraction||a.tourism||a.building||a.amenity||a.road||a.pedestrian||a.city||a.town||a.village||a.municipality||result.display_name?.split(',')[0]||'Ausgewählter Ort';}
+  function resetMapPickerView(){
+    $('mapSearchResults').classList.add('hidden');$('mapPickerMapWrap').classList.add('hidden');$('mapEmptyState').classList.remove('hidden');$('mapEmptyState').innerHTML='<span>⌖</span><strong>Noch kein Ort ausgewählt</strong><small>Suche oben nach einem Ort oder springe zu deiner aktuellen Position.</small>';$('mapSearchResults').innerHTML='';$('mapSearchStatus').textContent='';$('mapSearchInput').value='';
+    state.mapDraftLocation=clone(state.goalDraftLocation);const has=Boolean(state.mapDraftLocation);$('mapPickerApplyBtn').disabled=!has;$('mapSelectedTitle').textContent=has?state.mapDraftLocation.label:'Noch kein Punkt ausgewählt';$('mapSelectedDetail').textContent=has?'Bereits gespeicherter Ort. Suche oben, um ihn zu ändern.':'Wähle zuerst einen Suchtreffer oder deine Position.';
+  }
+  function openMapPicker(){resetMapPickerView();setModalLock(true);$('mapPickerDialog').showModal();}
+  function closeMapPicker(){state.geocodeController?.abort();if($('mapPickerDialog').open)$('mapPickerDialog').close();setModalLock($('goalDialog').open);}
+  function ensureMap(){
+    if(state.mapInstance)return state.mapInstance;if(!window.L){toast('Die Karte konnte nicht geladen werden.');return null;}state.mapInstance=window.L.map('mapPickerMap',{zoomControl:true,attributionControl:true});window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(state.mapInstance);state.mapInstance.on('click',event=>{void setMapPoint(event.latlng.lat,event.latlng.lng,'Ausgewählter Punkt',true);});return state.mapInstance;
+  }
+  function showMapAt(latitude,longitude,label){
+    $('mapSearchResults').classList.add('hidden');$('mapEmptyState').classList.add('hidden');$('mapPickerMapWrap').classList.remove('hidden');const map=ensureMap();if(!map)return;state.mapDraftLocation={label,latitude,longitude};if(state.mapMarker)state.mapMarker.setLatLng([latitude,longitude]);else state.mapMarker=window.L.marker([latitude,longitude]).addTo(map);map.setView([latitude,longitude],16);$('mapPickerApplyBtn').disabled=false;$('mapSelectedTitle').textContent=label;$('mapSelectedDetail').textContent='Du kannst den Marker durch Antippen der Karte noch verschieben.';requestAnimationFrame(()=>map.invalidateSize());
+  }
+  async function setMapPoint(latitude,longitude,label,reverse=false){showMapAt(latitude,longitude,label);if(reverse){$('mapSelectedDetail').textContent='Ortsname wird ermittelt …';try{const data=await requestNominatim('reverse',{lat:String(latitude),lon:String(longitude),zoom:'18',addressdetails:'1'});const resolved=shortPlaceLabel(data);if(state.mapDraftLocation&&Math.abs(state.mapDraftLocation.latitude-latitude)<1e-7&&Math.abs(state.mapDraftLocation.longitude-longitude)<1e-7){state.mapDraftLocation.label=resolved;$('mapSelectedTitle').textContent=resolved;$('mapSelectedDetail').textContent='Punkt auf der Karte ausgewählt.';}}catch(error){if(error.name!=='AbortError')$('mapSelectedDetail').textContent='Punkt ausgewählt; Ortsname konnte nicht geladen werden.';}}
+  }
+  async function searchMapPlace(){
+    const query=$('mapSearchInput').value.trim();if(query.length<2){$('mapSearchStatus').textContent='Bitte mindestens zwei Zeichen eingeben.';return;}$('mapSearchStatus').textContent='Vorschläge werden gesucht …';$('mapPickerMapWrap').classList.add('hidden');$('mapEmptyState').classList.add('hidden');
+    try{const results=await requestNominatim('search',{q:query,limit:'10',addressdetails:'1'});$('mapSearchResults')._results=results;if(!results.length){$('mapSearchResults').classList.add('hidden');$('mapEmptyState').classList.remove('hidden');$('mapEmptyState').innerHTML='<span>⌖</span><strong>Keine Vorschläge gefunden</strong><small>Versuche einen genaueren oder allgemeineren Suchbegriff.</small>';$('mapSearchStatus').textContent='Keine Treffer.';return;}$('mapSearchResults').innerHTML=results.map((result,index)=>`<button class="map-result" type="button" data-result-index="${index}"><span class="map-result-pin">⌖</span><span><strong>${escapeHtml(shortPlaceLabel(result))}</strong><small>${escapeHtml(result.display_name||'')}</small></span></button>`).join('');$('mapSearchResults').classList.remove('hidden');$('mapSearchStatus').textContent=`${results.length} Vorschläge gefunden. Wähle einen aus.`;}catch(error){if(error.name==='AbortError')return;console.error(error);$('mapSearchStatus').textContent='Die Ortssuche ist gerade nicht erreichbar.';$('mapEmptyState').classList.remove('hidden');}
+  }
+  function currentPositionMessage(error){if(error?.code===1)return'Standortzugriff wurde vom Browser nicht erlaubt.';if(error?.code===2)return'Deine Position konnte nicht bestimmt werden.';if(error?.code===3)return'Die Standortbestimmung hat zu lange gedauert.';return'Deine Position konnte nicht geladen werden.';}
+  function useCurrentMapPosition(){
+    if(!navigator.geolocation){$('mapSearchStatus').textContent='Dieser Browser unterstützt keine Standortbestimmung.';return;}$('mapCurrentLocationBtn').disabled=true;$('mapSearchStatus').textContent='Aktuelle Position wird bestimmt …';navigator.geolocation.getCurrentPosition(async position=>{const {latitude,longitude}=position.coords;let label='Meine aktuelle Position';try{const data=await requestNominatim('reverse',{lat:String(latitude),lon:String(longitude),zoom:'18',addressdetails:'1'});label=shortPlaceLabel(data);}catch{}showMapAt(latitude,longitude,label);$('mapSearchStatus').textContent='Position gefunden. Du kannst den Punkt auf der Karte noch verschieben.';$('mapCurrentLocationBtn').disabled=false;},error=>{$('mapSearchStatus').textContent=currentPositionMessage(error);$('mapCurrentLocationBtn').disabled=false;},{enableHighAccuracy:true,timeout:12000,maximumAge:30000});
+  }
+  function applyMapPickerSelection(){if(!state.mapDraftLocation)return;state.goalDraftLocation=normalizeLocation(state.mapDraftLocation);renderSelectedPlaceSummary();closeMapPicker();}
+
+  function closePanels(){$('toolsPanel').classList.add('hidden');$('actionPanel').classList.add('hidden');$('toolsBtn').setAttribute('aria-expanded','false');$('actionMenuBtn').setAttribute('aria-expanded','false');}
+  function togglePanel(id,buttonId){const panel=$(id),opening=panel.classList.contains('hidden');closePanels();if(opening){panel.classList.remove('hidden');$(buttonId).setAttribute('aria-expanded','true');}}
+  function applyToolSettings(){if(!state.currentTrip)return;state.currentTrip.lineStyle=$('lineStyleSelect').value;state.currentTrip.cardShape=$('cardShapeSelect').value;state.currentTrip.photoOnly=$('photoOnlyToggle').checked;renderCanvas();void saveCurrentTrip();}
+  function resetCurrentLayout(){if(!state.currentTrip)return;const positions=defaultPositions(state.currentTrip.goals.length);state.currentTrip.goals.forEach((goal,index)=>Object.assign(goal,positions[index]));state.currentTrip.decorations.forEach((item,index)=>{item.x=50+(index%3-1)*12;item.y=18+Math.floor(index/3)*9;});renderCanvas();void saveCurrentTrip();toast('Start-Layout wiederhergestellt.');}
+  function addGoal(){if(!state.currentTrip)return;if(state.currentTrip.goals.length>=10){toast('Es sind maximal 10 Kacheln möglich.');return;}const index=state.currentTrip.goals.length;const position=defaultPosition(index,index+1);const goal=newGoal(index,position);state.currentTrip.goals.push(goal);state.currentTrip.completed=false;state.selectedGoalId=goal.id;renderCanvas();void saveCurrentTrip();toast('Neue Kachel hinzugefügt.');}
+  function addEmoji(emoji){if(!state.currentTrip||!emoji)return;const n=state.currentTrip.decorations.length;const item={id:createId(),emoji:String(emoji).trim().slice(0,8)||'⭐',x:50+(n%5-2)*6,y:50+(Math.floor(n/5)%3-1)*8,size:42,rotation:(n%3-1)*8};state.currentTrip.decorations.push(item);state.editMode=true;$('trackerBoard').classList.add('edit-mode');$('editModeBtn').classList.add('active');$('editModeBtn').setAttribute('aria-pressed','true');$('editModeBtn').textContent='✓ Bearbeitungsmodus aktiv';state.selectedDecorationId=item.id;state.selectedGoalId=null;renderCanvas();void saveCurrentTrip();}
+  async function applyCustomBackground(file){if(!file||!state.currentTrip)return;if(!file.type.startsWith('image/')){toast('Bitte wähle ein Bild als Hintergrund.');return;}try{state.currentTrip.customBackground=await readAsDataURL(file);$('trackerBoard').style.background=boardBackground(state.currentTrip);$('removeCustomBackgroundBtn').classList.remove('hidden');await saveCurrentTrip();toast('Eigenes Hintergrundbild gespeichert.');}catch(error){console.error(error);toast('Hintergrund konnte nicht geladen werden.');}}
+
+  async function exportAll(){try{const trips=(await db.getAllTrips()).map(normalizeTrip).filter(Boolean);if(!trips.length){toast('Es gibt noch keine Tracker zum Exportieren.');return;}const backup={format:'travel-tracker-backup',version:6,exportedAt:new Date().toISOString(),trips};downloadBlob(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}),`travel-tracker-sicherung-${new Date().toISOString().slice(0,10)}.traveltracker`);}catch(error){console.error(error);toast('Sicherung konnte nicht erstellt werden.');}}
+  async function importAllFile(file){try{const data=JSON.parse(await file.text());const source=Array.isArray(data)?data:data?.trips;if(!Array.isArray(source))throw new Error('Ungültiges Format');const trips=source.map(normalizeTrip).filter(Boolean);if(!trips.length)throw new Error('Keine Tracker');await db.putTrips(trips);await refreshHome();toast(`${trips.length} Tracker importiert.`);}catch(error){console.error(error);toast('Sicherung konnte nicht importiert werden.');}}
+
+  async function inlineBackgroundAsset(css){if(!css||!css.includes('assets/birthday-balloons.png'))return css;try{const response=await fetch('assets/birthday-balloons.png');if(!response.ok)return css;const data=await readAsDataURL(await response.blob());return css.replace(/url\(['"]?assets\/birthday-balloons\.png['"]?\)/,`url('${data}')`);}catch{return css;}}
+  async function loadViewerAssets(){if(state.viewerAssetsPromise)return state.viewerAssetsPromise;state.viewerAssetsPromise=Promise.all([fetch('viewer.css').then(r=>r.text()),fetch('core.js').then(r=>r.text()),fetch('viewer.js').then(r=>r.text())]);return state.viewerAssetsPromise;}
+  async function buildStandaloneViewer(trip){const [css,core,viewer]=await loadViewerAssets();const copy=clone(trip);copy.backgroundCss=await inlineBackgroundAsset(boardBackground(copy));copy.customBackground=null;const json=JSON.stringify(copy).replace(/<\//g,'<\\/');return`<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><meta name="theme-color" content="#0f172a"><title>${escapeHtml(copy.title)} · Travel Tracker</title><style>${css}</style></head><body><main id="viewerApp" class="viewer-app" aria-live="polite"><section id="viewerLoading" class="viewer-message"><div><strong>Reise wird geladen …</strong></div></section></main><script>${core}<\/script><script id="embeddedTripData" type="application/json">${json}<\/script><script>${viewer}<\/script></body></html>`;}
+  async function shareTrip(){if(!state.currentTrip)return;try{const html=await buildStandaloneViewer(state.currentTrip);const filename=`${slugify(state.currentTrip.title)}-travel-tracker.html`;const file=new File([html],filename,{type:'text/html'});if(navigator.share&&navigator.canShare?.({files:[file]})){await navigator.share({title:state.currentTrip.title,text:'Meine Travel-Tracker-Reise',files:[file]});}else{downloadBlob(file,filename);toast('Ansicht wurde als HTML-Datei gespeichert.');}}catch(error){if(error?.name==='AbortError')return;console.error(error);toast('Ansicht konnte nicht geteilt werden.');}}
+  function previewTrip(){if(!state.currentTrip)return;location.href=`viewer.html?id=${encodeURIComponent(state.currentTrip.id)}`;}
+  async function printTrip(){
+    const trip=state.currentTrip;if(!trip)return;const goals=trip.goals.filter(goal=>goal.photo);if(!goals.length){toast('Es gibt noch keine Fotos für die PDF.');return;}const background=await inlineBackgroundAsset(boardBackground(trip));document.querySelector('.print-root')?.remove();const root=document.createElement('div');root.className='print-root';const pages=[];for(let i=0;i<goals.length;i+=4)pages.push(goals.slice(i,i+4));root.innerHTML=pages.map((page,pageIndex)=>`<section class="print-page" style="background:${background}"><header class="print-head"><span class="eyebrow">${escapeHtml(categoryLabel(trip.category).toUpperCase())}</span><h1>${escapeHtml(trip.title)}</h1><p>${escapeHtml((trip.participants||[]).join(', '))}</p></header><div class="print-grid">${page.map((goal,index)=>`<article class="print-card"><img src="${goal.photo}" alt="${escapeHtml(goal.name||`Ziel ${pageIndex*4+index+1}`)}"><div class="print-card-body"><strong style="color:${goal.titleColor};font-family:${goalFont(goal)}">${escapeHtml(goal.name)}</strong>${goal.capturedAt?`<small>${escapeHtml(formatDateTime(goal.capturedAt))}</small>`:''}${goal.location?`<div class="place">⌖ ${escapeHtml(goal.location.label)}</div>`:''}${goal.info?`<p style="color:${goal.infoColor}">${escapeHtml(goal.info)}</p>`:''}</div></article>`).join('')}</div><span class="print-page-number">${pageIndex+1} / ${pages.length}</span></section>`).join('');document.body.appendChild(root);const cleanup=()=>root.remove();window.addEventListener('afterprint',cleanup,{once:true});requestAnimationFrame(()=>requestAnimationFrame(()=>window.print()));setTimeout(cleanup,60000);
+  }
+  async function finishTrip(){if(!state.currentTrip)return;const missing=state.currentTrip.goals.filter(goal=>!goal.photo).length;if(missing){toast(`${missing} Kachel${missing===1?' benötigt':'n benötigen'} noch ein Foto. Lösche ungenutzte Kacheln oder füge Fotos hinzu.`);return;}state.currentTrip.completed=true;await saveCurrentTrip('Abgeschlossen');updateTrackerStatus('Abgeschlossen');toast('Tracker abgeschlossen.');}
+
+  function bindEvents(){
+    $('brandHome').addEventListener('click',async()=>{if(state.currentTrip)await saveCurrentTrip();await refreshHome();showScreen('home');});$('headerHomeBtn').addEventListener('click',async()=>{if(state.currentTrip)await saveCurrentTrip();await refreshHome();showScreen('home');});
+    document.querySelectorAll('[data-nav]').forEach(button=>button.addEventListener('click',()=>showScreen(button.dataset.nav)));
+    $('newTripBtn').addEventListener('click',()=>{resetWizard();showScreen('categories');});$('libraryNewBtn').addEventListener('click',()=>{resetWizard();showScreen('categories');});$('libraryBtn').addEventListener('click',()=>showScreen('library'));$('showAllBtn').addEventListener('click',()=>showScreen('library'));
+    $('exportAllBtn').addEventListener('click',exportAll);$('libraryExportBtn').addEventListener('click',exportAll);$('importAllBtn').addEventListener('click',()=>$('importPicker').click());$('libraryImportBtn').addEventListener('click',()=>$('importPicker').click());$('importPicker').addEventListener('change',async event=>{const file=event.target.files?.[0];if(file)await importAllFile(file);event.target.value='';});
+    $('recentTrips').addEventListener('click',handleTripGridClick);$('tripLibrary').addEventListener('click',handleTripGridClick);
+    document.querySelector('.category-grid').addEventListener('click',event=>{const button=event.target.closest('[data-category]');if(!button)return;state.wizard.category=button.dataset.category;state.wizard.background=null;renderBackgrounds();showScreen('backgrounds');});
+    $('backgroundGrid').addEventListener('click',event=>{const button=event.target.closest('[data-bg-id]');if(!button)return;state.wizard.background=backgroundFor(state.wizard.category,button.dataset.bgId);showScreen('setup');});
+    $('decreasePeople').addEventListener('click',()=>adjustPeople(-1));$('increasePeople').addEventListener('click',()=>adjustPeople(1));$('participantFields').addEventListener('input',event=>{const input=event.target.closest('[data-person-index]');if(input)state.wizard.participants[Number(input.dataset.personIndex)]=input.value;});$('createTrackerBtn').addEventListener('click',()=>void createTripFromWizard());
+
+    $('editModeBtn').addEventListener('click',toggleEditMode);$('toolsBtn').addEventListener('click',()=>togglePanel('toolsPanel','toolsBtn'));$('actionMenuBtn').addEventListener('click',()=>togglePanel('actionPanel','actionMenuBtn'));$('toolsCloseBtn').addEventListener('click',closePanels);$('actionCloseBtn').addEventListener('click',closePanels);
+    $('lineStyleSelect').addEventListener('change',applyToolSettings);$('cardShapeSelect').addEventListener('change',applyToolSettings);$('photoOnlyToggle').addEventListener('change',applyToolSettings);$('resetLayoutBtn').addEventListener('click',resetCurrentLayout);$('addGoalBtn').addEventListener('click',addGoal);
+    $('customBackgroundBtn').addEventListener('click',()=>$('backgroundPicker').click());$('backgroundPicker').addEventListener('change',async event=>{const file=event.target.files?.[0];if(file)await applyCustomBackground(file);event.target.value='';});$('removeCustomBackgroundBtn').addEventListener('click',()=>{if(!state.currentTrip)return;state.currentTrip.customBackground=null;$('trackerBoard').style.background=boardBackground(state.currentTrip);$('removeCustomBackgroundBtn').classList.add('hidden');void saveCurrentTrip();});
+    $('emojiPalette').addEventListener('click',event=>{const button=event.target.closest('[data-emoji]');if(button)addEmoji(button.dataset.emoji);});$('addCustomEmojiBtn').addEventListener('click',()=>{const value=$('customEmojiInput').value.trim();if(!value){toast('Bitte gib ein Emoji ein.');return;}addEmoji(value);$('customEmojiInput').value='';});
+    $('saveBtn').addEventListener('click',async()=>{if(await saveCurrentTrip('Jetzt gespeichert'))toast('Tracker gespeichert.');});$('finishBtn').addEventListener('click',finishTrip);$('previewTripBtn').addEventListener('click',previewTrip);$('shareFileBtn').addEventListener('click',shareTrip);$('pdfBtn').addEventListener('click',()=>void printTrip());
+
+    $('goalsCanvas').addEventListener('pointerdown',startPointerSession);$('decorationsCanvas').addEventListener('pointerdown',startPointerSession);$('goalsCanvas').addEventListener('click',handleCanvasClick);$('decorationsCanvas').addEventListener('click',handleCanvasClick);window.addEventListener('pointermove',handlePointerMove,{passive:false});window.addEventListener('pointerup',endPointerSession);window.addEventListener('pointercancel',endPointerSession);
+
+    $('takePhotoBtn').addEventListener('click',()=>$('cameraPicker').click());$('choosePhotoBtn').addEventListener('click',()=>$('photoPicker').click());$('cameraPicker').addEventListener('change',async event=>{await applyPickedPhoto(event.target.files?.[0]);event.target.value='';});$('photoPicker').addEventListener('change',async event=>{await applyPickedPhoto(event.target.files?.[0]);event.target.value='';});$('removePhotoBtn').addEventListener('click',removeDraftPhoto);
+    $('goalNameInput').addEventListener('input',()=>{if(state.goalDraft)state.goalDraft.name=$('goalNameInput').value;});$('goalInfoInput').addEventListener('input',()=>{if(state.goalDraft)state.goalDraft.info=$('goalInfoInput').value;});
+    $('colorToolBtn').addEventListener('click',()=>toggleStylePopover('colorPopover'));$('fontToolBtn').addEventListener('click',()=>toggleStylePopover('fontPopover'));$('titleColorInput').addEventListener('input',event=>{if(!state.goalDraft)return;state.goalDraft.titleColor=event.target.value;renderGoalDraft();});$('infoColorInput').addEventListener('input',event=>{if(!state.goalDraft)return;state.goalDraft.infoColor=event.target.value;renderGoalDraft();});$('fontPopover').addEventListener('click',event=>{const button=event.target.closest('[data-font]');if(!button||!state.goalDraft)return;state.goalDraft.fontKey=button.dataset.font;renderGoalDraft();closeStylePopovers();});
+    $('pickPlaceBtn').addEventListener('click',openMapPicker);$('removePlaceBtn').addEventListener('click',()=>{state.goalDraftLocation=null;renderSelectedPlaceSummary();});$('goalDialogCloseBtn').addEventListener('click',closeGoalDialog);$('goalCancelBtn').addEventListener('click',closeGoalDialog);$('saveGoalBtn').addEventListener('click',()=>void saveGoalFromDialog());
+    $('goalDialog').addEventListener('cancel',event=>{event.preventDefault();closeGoalDialog();});
+
+    $('mapSearchForm').addEventListener('submit',event=>{event.preventDefault();void searchMapPlace();});$('mapSearchResults').addEventListener('click',event=>{const button=event.target.closest('[data-result-index]');if(!button)return;const result=$('mapSearchResults')._results?.[Number(button.dataset.resultIndex)];if(!result)return;const lat=Number(result.lat),lng=Number(result.lon),label=shortPlaceLabel(result);showMapAt(lat,lng,label);$('mapSearchStatus').textContent=`${label} ausgewählt. Du kannst den Punkt auf der Karte noch genauer setzen.`;});$('mapCurrentLocationBtn').addEventListener('click',useCurrentMapPosition);$('mapPickerApplyBtn').addEventListener('click',applyMapPickerSelection);$('mapPickerCancelBtn').addEventListener('click',closeMapPicker);$('mapPickerCloseBtn').addEventListener('click',closeMapPicker);$('mapPickerDialog').addEventListener('cancel',event=>{event.preventDefault();closeMapPicker();});
+
+    $('confirmActionBtn').addEventListener('click',async event=>{event.preventDefault();const action=state.confirmAction;state.confirmAction=null;$('confirmDialog').close();if(action)await action();});$('confirmDialog').addEventListener('close',()=>{state.confirmAction=null;});
+    window.addEventListener('resize',()=>{if(state.currentTrip&&$('screenTracker').classList.contains('active'))drawJourneyPath();});
   }
 
-  function openTrackerScreen() {
-    const trip = state.currentTrip;
-    if (!trip) return;
-
-    state.layoutMode = false;
-    state.selectedGoalIndex = -1;
-    $('layoutEditor').classList.add('hidden');
-    $('saveState').textContent = 'Lokal gespeichert';
-    $('trackerCategoryLabel').textContent = categoryLabel(trip.category).toUpperCase();
-    $('trackerTitle').textContent = trip.title;
-    $('boardBadge').textContent = categoryLabel(trip.category).toUpperCase();
-    $('boardTitle').textContent = trip.title;
-    $('trackerBoard').style.background = trip.backgroundCss || '#d7dde6';
-    $('lineStyleSelect').value = trip.lineStyle || 'dashed';
-
-    showScreen('tracker');
-    renderGoals();
-  }
-
-  function renderGoals() {
-    const trip = state.currentTrip;
-    if (!trip) return;
-
-    $('goalsCanvas').innerHTML = trip.goals.map((goal, index) => {
-      const photo = goal.photo
-        ? `<img src="${goal.photo}" alt="${escapeHtml(goal.name)}">`
-        : `<div class="goal-placeholder">Foto ${index + 1}</div>`;
-      const location = goal.location?.label
-        ? `<span class="goal-location-badge">⌖ ${escapeHtml(goal.location.label)}</span>`
-        : '';
-
-      return `<div class="goal-anchor ${state.selectedGoalIndex === index ? 'selected' : ''}" data-goal-index="${index}" style="left:${goal.x}%;top:${goal.y}%">
-        <div class="goal-card-visual" style="transform:rotate(${goal.rotation || 0}deg)">
-          <span class="goal-number">${index + 1}</span>
-          ${photo}
-          ${location}
-          <div class="goal-card-meta">
-            <strong>${escapeHtml(goal.name || `Ziel ${index + 1}`)}</strong>
-            <small>${goal.photo ? 'Erinnerung gespeichert' : 'Antippen zum Bearbeiten'}</small>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
-
-    updateProgress();
-    requestAnimationFrame(drawJourneyPath);
-  }
-
-  function updateProgress() {
-    const trip = state.currentTrip;
-    if (!trip) return;
-
-    const done = trip.goals.filter(goal => goal.photo).length;
-    const total = trip.goals.length;
-    $('progressText').textContent = `${done} / ${total}`;
-    $('progressBar').style.width = `${total ? (done / total) * 100 : 0}%`;
-    $('completeActions').classList.toggle('hidden', !trip.completed);
-    $('finishBtn').textContent = trip.completed ? 'Abgeschlossen' : 'Tracker abschließen';
-    $('finishBtn').disabled = trip.completed;
-  }
-
-  function sidePoint(goal, side, otherGoal) {
-    let resolvedSide = side;
-    if (resolvedSide === 'auto') {
-      const dx = otherGoal.x - goal.x;
-      const dy = otherGoal.y - goal.y;
-      resolvedSide = Math.abs(dx) > Math.abs(dy)
-        ? (dx > 0 ? 'right' : 'left')
-        : (dy > 0 ? 'bottom' : 'top');
-    }
-
-    const halfWidth = 15.5;
-    const halfHeight = 8;
-    if (resolvedSide === 'left') return [goal.x - halfWidth, goal.y];
-    if (resolvedSide === 'right') return [goal.x + halfWidth, goal.y];
-    if (resolvedSide === 'top') return [goal.x, goal.y - halfHeight];
-    return [goal.x, goal.y + halfHeight];
-  }
-
-  function drawJourneyPath() {
-    const trip = state.currentTrip;
-    const svg = $('journeyPath');
-    if (!trip || trip.lineStyle === 'none') {
-      svg.innerHTML = '';
-      return;
-    }
-
-    const paths = [];
-    for (let index = 0; index < trip.goals.length - 1; index += 1) {
-      const from = trip.goals[index];
-      const to = trip.goals[index + 1];
-      const [startXPercent, startYPercent] = sidePoint(from, from.exitSide || 'auto', to);
-      const [endXPercent, endYPercent] = sidePoint(to, to.entrySide || 'auto', from);
-      const x1 = startXPercent * 10;
-      const y1 = startYPercent * 14.14;
-      const x2 = endXPercent * 10;
-      const y2 = endYPercent * 14.14;
-      const curve = (x2 - x1) * 0.45;
-      const path = `M ${x1} ${y1} C ${x1 + curve} ${y1}, ${x2 - curve} ${y2}, ${x2} ${y2}`;
-      const dash = trip.lineStyle === 'dashed' ? '16 14' : 'none';
-      paths.push(`<path d="${path}" fill="none" stroke="#152437" stroke-width="4" stroke-linecap="round" stroke-dasharray="${dash}" opacity=".92"/>`);
-    }
-    svg.innerHTML = paths.join('');
-  }
-
-  function selectGoal(index, anchor = null) {
-    state.selectedGoalIndex = index;
-    renderSelectionControls();
-    document.querySelectorAll('.goal-anchor.selected').forEach(element => element.classList.remove('selected'));
-    anchor?.classList.add('selected');
-  }
-
-  function handleGoalPointerDown(event) {
-    if (!state.layoutMode || !state.currentTrip) return;
-    const anchor = event.target.closest('.goal-anchor');
-    if (!anchor) return;
-
-    event.preventDefault();
-    const index = Number(anchor.dataset.goalIndex);
-    const goal = state.currentTrip.goals[index];
-    const boardRect = $('trackerBoard').getBoundingClientRect();
-    const start = {
-      x: event.clientX,
-      y: event.clientY,
-      goalX: goal.x,
-      goalY: goal.y
-    };
-    let moved = false;
-
-    selectGoal(index, anchor);
-    anchor.setPointerCapture?.(event.pointerId);
-
-    const onMove = moveEvent => {
-      moved = true;
-      const nextX = Math.max(16, Math.min(84, start.goalX + ((moveEvent.clientX - start.x) / boardRect.width) * 100));
-      const nextY = Math.max(14, Math.min(91, start.goalY + ((moveEvent.clientY - start.y) / boardRect.height) * 100));
-      goal.x = nextX;
-      goal.y = nextY;
-      anchor.style.left = `${nextX}%`;
-      anchor.style.top = `${nextY}%`;
-      drawJourneyPath();
-    };
-
-    const onEnd = async endEvent => {
-      anchor.removeEventListener('pointermove', onMove);
-      anchor.removeEventListener('pointerup', onEnd);
-      anchor.removeEventListener('pointercancel', onEnd);
-      try { anchor.releasePointerCapture?.(endEvent.pointerId); } catch {}
-      state.dragFinishedAt = Date.now();
-      if (moved) await saveCurrentTrip();
-    };
-
-    anchor.addEventListener('pointermove', onMove);
-    anchor.addEventListener('pointerup', onEnd);
-    anchor.addEventListener('pointercancel', onEnd);
-  }
-
-  function handleGoalClick(event) {
-    if (state.layoutMode || Date.now() - state.dragFinishedAt < 250) return;
-    const anchor = event.target.closest('.goal-anchor');
-    if (!anchor) return;
-    openGoalDialog(Number(anchor.dataset.goalIndex));
-  }
-
-  function renderSelectionControls() {
-    const goal = state.currentTrip?.goals?.[state.selectedGoalIndex];
-    $('selectedGoalLabel').textContent = goal ? goal.name : 'Keines';
-    $('entrySideSelect').value = goal?.entrySide || 'auto';
-    $('exitSideSelect').value = goal?.exitSide || 'auto';
-  }
-
-  function rotateSelected(delta) {
-    const goal = state.currentTrip?.goals?.[state.selectedGoalIndex];
-    if (!goal) {
-      toast('Bitte zuerst eine Kachel auswählen.');
-      return;
-    }
-    setSelectedRotation((goal.rotation || 0) + delta);
-  }
-
-  function setSelectedRotation(value) {
-    const goal = state.currentTrip?.goals?.[state.selectedGoalIndex];
-    if (!goal) return;
-    goal.rotation = Math.max(-25, Math.min(25, value));
-    renderGoals();
-    renderSelectionControls();
-    void saveCurrentTrip();
-  }
-
-  function openGoalDialog(index) {
-    const trip = state.currentTrip;
-    if (!trip?.goals[index]) return;
-
-    state.editGoalIndex = index;
-    const goal = trip.goals[index];
-    $('dialogTitle').textContent = goal.name || `Ziel ${index + 1}`;
-    $('goalNameInput').value = goal.name || '';
-    $('goalTimeInput').value = toLocalDateTimeInput(goal.capturedAt);
-    $('goalInfoInput').value = goal.info || '';
-    state.goalDraftLocation = normalizeLocation(goal.location);
-    renderSelectedPlaceSummary();
-    renderDialogPhoto(goal.photo);
-    updatePhotoRemoveButton(goal.photo);
-    $('goalDialog').showModal();
-  }
-
-  function renderDialogPhoto(photo) {
-    $('dialogPhotoPreview').innerHTML = photo
-      ? `<img src="${photo}" alt="Vorschau">`
-      : '<span>Noch kein Foto</span>';
-  }
-
-  function updatePhotoRemoveButton(photo) {
-    $('removePhotoBtn').classList.toggle('hidden', !photo);
-  }
-
-  async function applyPickedPhoto(file, source = 'library') {
-    if (!file || state.editGoalIndex < 0 || !state.currentTrip) return;
-
-    try {
-      const dataUrl = await readAsDataURL(file);
-      const goal = state.currentTrip.goals[state.editGoalIndex];
-      goal.photo = dataUrl;
-      if (source === 'camera' || !goal.capturedAt) {
-        goal.capturedAt = new Date().toISOString();
-        $('goalTimeInput').value = nowLocalDateTimeInput();
-      }
-
-      renderDialogPhoto(dataUrl);
-      updatePhotoRemoveButton(dataUrl);
-      renderGoals();
-      await saveCurrentTrip('Foto gespeichert');
-
-    } catch (error) {
-      console.error(error);
-      toast('Foto konnte nicht gespeichert werden.');
-    }
-  }
-
-  async function removeCurrentGoalPhoto() {
-    if (state.editGoalIndex < 0 || !state.currentTrip) return;
-    const goal = state.currentTrip.goals[state.editGoalIndex];
-    goal.photo = null;
-    state.currentTrip.completed = false;
-    renderDialogPhoto(null);
-    updatePhotoRemoveButton(null);
-    renderGoals();
-    await saveCurrentTrip('Foto entfernt');
-  }
-
-  function renderSelectedPlaceSummary() {
-    const location = normalizeLocation(state.goalDraftLocation);
-    const summary = $('selectedPlaceSummary');
-    const removeButton = $('removePlaceBtn');
-
-    if (!location) {
-      summary.innerHTML = '<span class="selected-place-icon">⌖</span><div><strong>Noch kein Ort ausgewählt</strong><small>Der Ort ist optional.</small></div>';
-      removeButton.classList.add('hidden');
-      $('pickPlaceBtn').textContent = 'Ort auswählen';
-      return;
-    }
-
-    const coordinates = Number.isFinite(location.latitude) && Number.isFinite(location.longitude)
-      ? `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`
-      : 'Ort gespeichert';
-
-    summary.innerHTML = `<span class="selected-place-icon active">⌖</span><div><strong>${escapeHtml(location.label)}</strong><small>${escapeHtml(coordinates)}</small></div>`;
-    removeButton.classList.remove('hidden');
-    $('pickPlaceBtn').textContent = 'Ort ändern';
-  }
-
-  function clearMapSelection() {
-    state.goalDraftLocation = null;
-    renderSelectedPlaceSummary();
-  }
-
-  function shortPlaceLabel(result) {
-    const named = String(result?.namedetails?.name || result?.name || '').trim();
-    if (named) return named;
-    const display = String(result?.display_name || '').trim();
-    if (!display) return 'Ausgewählter Ort';
-    return display.split(',').slice(0, 2).join(',').trim();
-  }
-
-  function setMapDraftLocation(latitude, longitude, label = 'Ausgewählter Ort') {
-    const lat = Number(latitude);
-    const lng = Number(longitude);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-
-    state.mapDraftLocation = {
-      label: String(label || 'Ausgewählter Ort').trim() || 'Ausgewählter Ort',
-      latitude: lat,
-      longitude: lng,
-      mapsUrl: mapsCoordinatesUrl(lat, lng)
-    };
-
-    if (state.mapInstance) {
-      if (!state.mapMarker) {
-        state.mapMarker = window.L.marker([lat, lng]).addTo(state.mapInstance);
-      } else {
-        state.mapMarker.setLatLng([lat, lng]);
-      }
-    }
-
-    $('mapSelectedTitle').textContent = state.mapDraftLocation.label;
-    $('mapSelectedDetail').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    $('mapPickerApplyBtn').disabled = false;
-  }
-
-  async function waitForGeocodeSlot() {
-    const elapsed = Date.now() - state.lastGeocodeAt;
-    if (elapsed < 1050) {
-      await new Promise(resolve => setTimeout(resolve, 1050 - elapsed));
-    }
-    state.lastGeocodeAt = Date.now();
-  }
-
-  async function requestNominatim(path, params) {
-    if (state.geocodeController) state.geocodeController.abort();
-    state.geocodeController = new AbortController();
-    await waitForGeocodeSlot();
-
-    const url = new URL(`https://nominatim.openstreetmap.org/${path}`);
-    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
-    const response = await fetch(url, {
-      signal: state.geocodeController.signal,
-      headers: { 'Accept': 'application/json' }
-    });
-    if (!response.ok) throw new Error('Die Ortssuche ist momentan nicht erreichbar.');
-    return response.json();
-  }
-
-  function renderMapSearchResults(results) {
-    const wrap = $('mapSearchResults');
-    if (!Array.isArray(results) || !results.length) {
-      wrap.innerHTML = '';
-      wrap.classList.add('hidden');
-      $('mapSearchStatus').textContent = 'Kein passender Ort gefunden. Versuche eine genauere Suche oder tippe direkt auf die Karte.';
-      return;
-    }
-
-    wrap.innerHTML = results.map((result, index) => {
-      const label = String(result.display_name || shortPlaceLabel(result));
-      return `<button class="map-result" type="button" data-result-index="${index}">
-        <span class="map-result-pin">⌖</span>
-        <span><strong>${escapeHtml(shortPlaceLabel(result))}</strong><small>${escapeHtml(label)}</small></span>
-      </button>`;
-    }).join('');
-    wrap._results = results;
-    wrap.classList.remove('hidden');
-    $('mapSearchStatus').textContent = `${results.length} Treffer gefunden.`;
-  }
-
-  async function searchMapPlace() {
-    const query = $('mapSearchInput').value.trim();
-    if (!query) {
-      $('mapSearchStatus').textContent = 'Bitte gib zuerst einen Ort ein, zum Beispiel „Kölner Dom“.';
-      $('mapSearchInput').focus();
-      return;
-    }
-
-    $('mapSearchStatus').textContent = 'Ort wird gesucht …';
-    $('mapSearchResults').classList.add('hidden');
-
-    try {
-      const results = await requestNominatim('search', {
-        format: 'jsonv2',
-        q: query,
-        limit: '5',
-        addressdetails: '1',
-        namedetails: '1',
-        'accept-language': 'de'
-      });
-      renderMapSearchResults(results);
-    } catch (error) {
-      if (error?.name === 'AbortError') return;
-      console.error(error);
-      $('mapSearchStatus').textContent = error.message || 'Die Ortssuche ist momentan nicht erreichbar.';
-    }
-  }
-
-  function currentPositionErrorMessage(error) {
-    switch (error?.code) {
-      case 1:
-        return 'Der Standortzugriff wurde nicht erlaubt. Du kannst den Ort weiterhin suchen oder direkt auf der Karte auswählen.';
-      case 2:
-        return 'Deine aktuelle Position konnte gerade nicht bestimmt werden. Versuche es erneut oder wähle den Ort auf der Karte.';
-      case 3:
-        return 'Die Standortbestimmung hat zu lange gedauert. Versuche es erneut oder wähle den Ort auf der Karte.';
-      default:
-        return 'Die aktuelle Position konnte nicht ermittelt werden. Du kannst den Ort weiterhin manuell auswählen.';
-    }
-  }
-
-  function useCurrentMapPosition() {
-    const button = $('mapCurrentLocationBtn');
-    if (!navigator.geolocation) {
-      $('mapSearchStatus').textContent = 'Dieser Browser unterstützt keine Standortbestimmung. Du kannst den Ort weiterhin suchen oder auf der Karte auswählen.';
-      return;
-    }
-    if (!window.isSecureContext && location.hostname !== 'localhost') {
-      $('mapSearchStatus').textContent = 'Die aktuelle Position kann nur über eine sichere HTTPS-Verbindung abgefragt werden.';
-      return;
-    }
-
-    button.disabled = true;
-    button.classList.add('is-loading');
-    $('mapSearchStatus').textContent = 'Aktuelle Position wird ermittelt …';
-
-    // Wichtig: Der Geolocation-Aufruf erfolgt direkt aus dem Klick-Handler heraus.
-    navigator.geolocation.getCurrentPosition(position => {
-      const lat = Number(position.coords.latitude);
-      const lng = Number(position.coords.longitude);
-      const accuracy = Number(position.coords.accuracy);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        $('mapSearchStatus').textContent = 'Der Browser hat keine gültigen Koordinaten geliefert.';
-        button.disabled = false;
-        button.classList.remove('is-loading');
-        return;
-      }
-
-      if (ensureMapPicker()) {
-        state.mapInstance.setView([lat, lng], 17, { animate: true });
-      }
-      setMapDraftLocation(lat, lng, 'Aktuelle Position');
-      $('mapSearchResults').innerHTML = '';
-      $('mapSearchResults').classList.add('hidden');
-      const accuracyText = Number.isFinite(accuracy) ? ` (Genauigkeit etwa ±${Math.round(accuracy)} m)` : '';
-      $('mapSearchStatus').textContent = `Position gefunden${accuracyText}. Ortsname wird gesucht …`;
-
-      void reverseMapPoint(lat, lng).finally(() => {
-        button.disabled = false;
-        button.classList.remove('is-loading');
-      });
-    }, error => {
-      $('mapSearchStatus').textContent = currentPositionErrorMessage(error);
-      button.disabled = false;
-      button.classList.remove('is-loading');
-    }, {
-      enableHighAccuracy: true,
-      timeout: 12000,
-      maximumAge: 30000
-    });
-  }
-
-  function setMapPickerPageLock(locked) {
-    document.documentElement.classList.toggle('map-picker-open', locked);
-    document.body.classList.toggle('map-picker-open', locked);
-  }
-
-  function closeMapPicker() {
-    if ($('mapPickerDialog').open) $('mapPickerDialog').close();
-    setMapPickerPageLock(false);
-  }
-
-  async function reverseMapPoint(latitude, longitude) {
-    $('mapSearchStatus').textContent = 'Ort wird zur Kartenposition gesucht …';
-    try {
-      const result = await requestNominatim('reverse', {
-        format: 'jsonv2',
-        lat: String(latitude),
-        lon: String(longitude),
-        zoom: '18',
-        namedetails: '1',
-        'accept-language': 'de'
-      });
-      const label = shortPlaceLabel(result);
-      setMapDraftLocation(latitude, longitude, label);
-      $('mapSearchStatus').textContent = `Ausgewählt: ${label}`;
-    } catch (error) {
-      if (error?.name === 'AbortError') return;
-      console.error(error);
-      setMapDraftLocation(latitude, longitude, 'Ausgewählter Ort');
-      $('mapSearchStatus').textContent = 'Punkt ausgewählt. Ein genauer Ortsname konnte nicht geladen werden.';
-    }
-  }
-
-  function ensureMapPicker() {
-    if (!window.L) {
-      toast('Die Karte konnte nicht geladen werden. Bitte prüfe deine Internetverbindung.');
-      return false;
-    }
-
-    if (!state.mapInstance) {
-      state.mapInstance = window.L.map('mapPickerMap', {
-        zoomControl: true,
-        attributionControl: true
-      });
-      window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende'
-      }).addTo(state.mapInstance);
-
-      state.mapInstance.on('click', event => {
-        const { lat, lng } = event.latlng;
-        setMapDraftLocation(lat, lng, 'Ausgewählter Ort');
-        void reverseMapPoint(lat, lng);
-      });
-    }
-
-    return true;
-  }
-
-  function openMapPicker() {
-    state.mapDraftLocation = normalizeLocation(state.goalDraftLocation);
-    $('mapSearchInput').value = state.mapDraftLocation?.label || '';
-    $('mapSearchStatus').textContent = '';
-    $('mapSearchResults').innerHTML = '';
-    $('mapSearchResults').classList.add('hidden');
-
-    if (state.mapDraftLocation) {
-      $('mapSelectedTitle').textContent = state.mapDraftLocation.label;
-      $('mapSelectedDetail').textContent = `${state.mapDraftLocation.latitude?.toFixed?.(5) ?? ''}, ${state.mapDraftLocation.longitude?.toFixed?.(5) ?? ''}`.replace(/^,\s*$/, 'Ort gespeichert');
-      $('mapPickerApplyBtn').disabled = false;
-    } else {
-      $('mapSelectedTitle').textContent = 'Noch kein Punkt ausgewählt';
-      $('mapSelectedDetail').textContent = 'Suche einen Ort oder tippe auf die Karte.';
-      $('mapPickerApplyBtn').disabled = true;
-    }
-
-    setMapPickerPageLock(true);
-    $('mapPickerDialog').showModal();
-
-    requestAnimationFrame(() => {
-      if (!ensureMapPicker()) return;
-      const hasCoordinates = Number.isFinite(state.mapDraftLocation?.latitude) && Number.isFinite(state.mapDraftLocation?.longitude);
-      const center = hasCoordinates
-        ? [state.mapDraftLocation.latitude, state.mapDraftLocation.longitude]
-        : [51.1657, 10.4515];
-      const zoom = hasCoordinates ? 15 : 6;
-      state.mapInstance.setView(center, zoom);
-      if (hasCoordinates) setMapDraftLocation(center[0], center[1], state.mapDraftLocation.label);
-      else if (state.mapMarker) {
-        state.mapMarker.remove();
-        state.mapMarker = null;
-      }
-      state.mapInstance.invalidateSize();
-    });
-  }
-
-  function applyMapPickerSelection() {
-    if (!state.mapDraftLocation) return;
-    state.goalDraftLocation = normalizeLocation(state.mapDraftLocation);
-    renderSelectedPlaceSummary();
-    closeMapPicker();
-  }
-
-  async function saveGoalFromDialog() {
-    if (state.editGoalIndex < 0 || !state.currentTrip) return;
-
-    const goal = state.currentTrip.goals[state.editGoalIndex];
-    goal.name = $('goalNameInput').value.trim() || `Ziel ${state.editGoalIndex + 1}`;
-    goal.capturedAt = fromLocalDateTimeInput($('goalTimeInput').value) || goal.capturedAt || null;
-    goal.info = $('goalInfoInput').value.trim();
-    goal.location = normalizeLocation(state.goalDraftLocation);
-
-    await saveCurrentTrip();
-    renderGoals();
-    $('goalDialog').close();
-  }
-
-  async function exportAll() {
-    try {
-      const trips = (await db.getAllTrips()).map(normalizeTrip).filter(Boolean);
-      if (!trips.length) {
-        toast('Es gibt noch keine Tracker zum Exportieren.');
-        return;
-      }
-
-      const backup = {
-        format: 'travel-tracker-backup',
-        version: 5,
-        exportedAt: new Date().toISOString(),
-        trips
-      };
-      downloadBlob(
-        new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }),
-        `travel-tracker-sicherung-${new Date().toISOString().slice(0, 10)}.traveltracker`
-      );
-    } catch (error) {
-      console.error(error);
-      toast('Sicherung konnte nicht erstellt werden.');
-    }
-  }
-
-  async function importAllFile(file) {
-    try {
-      const data = JSON.parse(await file.text());
-      const sourceTrips = Array.isArray(data) ? data : data?.trips;
-      if (!Array.isArray(sourceTrips)) throw new Error('Ungültiges Sicherungsformat');
-
-      const trips = sourceTrips.map(normalizeTrip).filter(Boolean);
-      if (!trips.length) throw new Error('Keine gültigen Tracker gefunden');
-
-      await db.putTrips(trips);
-      await refreshHome();
-      toast(`${trips.length} Tracker importiert.`);
-    } catch (error) {
-      console.error(error);
-      toast('Sicherung konnte nicht importiert werden.');
-    }
-  }
-
-  async function inlineBackgroundAsset(css) {
-    const match = /url\(['"]?([^'")]+)['"]?\)/.exec(css || '');
-    if (!match || /^data:/.test(match[1]) || /^https?:/.test(match[1])) return css;
-
-    try {
-      const response = await fetch(match[1]);
-      if (!response.ok) throw new Error(`Hintergrund konnte nicht geladen werden (${response.status}).`);
-      const dataUrl = await readAsDataURL(await response.blob());
-      return css.replace(match[1], dataUrl);
-    } catch (error) {
-      console.warn('Hintergrund konnte nicht in die Share-Datei eingebettet werden.', error);
-      return css;
-    }
-  }
-
-  async function loadViewerAssets() {
-    if (!state.viewerAssetsPromise) {
-      state.viewerAssetsPromise = Promise.all([
-        fetch('core.js'),
-        fetch('viewer.css'),
-        fetch('viewer.js')
-      ]).then(async responses => {
-        for (const response of responses) {
-          if (!response.ok) throw new Error(`Viewer-Datei konnte nicht geladen werden (${response.status}).`);
-        }
-        return Promise.all(responses.map(response => response.text()));
-      }).then(([coreJs, css, viewerJs]) => ({ coreJs, css, viewerJs }));
-    }
-    return state.viewerAssetsPromise;
-  }
-
-  async function buildStandaloneViewer(trip) {
-    const { coreJs, css, viewerJs } = await loadViewerAssets();
-    const clonedTrip = deepClone(trip);
-
-    clonedTrip.backgroundCss = await inlineBackgroundAsset(clonedTrip.backgroundCss || '');
-    const escapeScript = script => script.replace(/<\/script/gi, '<\\/script');
-    const json = escapeScript(JSON.stringify(clonedTrip));
-    const inlineCore = escapeScript(coreJs);
-    const inlineViewer = escapeScript(viewerJs);
-    const inlineCss = css.replace(/<\/style/gi, '<\\/style');
-
-    return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><meta name="theme-color" content="#0f172a"><title>${escapeHtml(trip.title)} · Travel Tracker</title><style>${inlineCss}</style></head><body><main id="viewerApp" class="viewer-app" aria-live="polite"><section id="viewerLoading" class="viewer-message"><div><strong>Reise wird geladen …</strong></div></section></main><script>${inlineCore}<\/script><script id="embeddedTripData" type="application/json">${json}<\/script><script>${inlineViewer}<\/script></body></html>`;
-  }
-
-  async function shareTrip() {
-    if (!state.currentTrip) return;
-
-    try {
-      const html = await buildStandaloneViewer(state.currentTrip);
-      const filename = `${slugify(state.currentTrip.title)}-travel-tracker.html`;
-      const file = new File([html], filename, { type: 'text/html' });
-
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({
-          title: state.currentTrip.title,
-          text: 'Travel-Tracker-Reise',
-          files: [file]
-        });
-      } else {
-        downloadBlob(file, filename);
-        toast('Präsentationsdatei heruntergeladen. Im Browser öffnen.');
-      }
-    } catch (error) {
-      if (error?.name === 'AbortError') return;
-      console.error(error);
-      toast('Ansicht konnte nicht erstellt werden.');
-    }
-  }
-
-  function previewTrip() {
-    if (!state.currentTrip) return;
-    const url = new URL('viewer.html', location.href);
-    url.searchParams.set('id', state.currentTrip.id);
-    location.assign(url.href);
-  }
-
-  async function printTrip() {
-    const trip = state.currentTrip;
-    if (!trip) return;
-
-    const goals = trip.goals.filter(goal => goal.photo);
-    if (!goals.length) {
-      toast('Für die PDF-Ausgabe sind noch keine Fotos vorhanden.');
-      return;
-    }
-
-    document.querySelector('.print-root')?.remove();
-    const printRoot = document.createElement('div');
-    printRoot.className = 'print-root';
-    const chunks = [];
-    for (let index = 0; index < goals.length; index += 4) chunks.push(goals.slice(index, index + 4));
-
-    printRoot.innerHTML = chunks.map((pageGoals, pageIndex) => {
-      const cards = pageGoals.map((goal, index) => {
-        const place = goal.location?.label ? `<div class="place">⌖ ${escapeHtml(goal.location.label)}</div>` : '';
-        return `<article class="print-card">
-          <img src="${goal.photo}" alt="${escapeHtml(goal.name || `Ziel ${pageIndex * 4 + index + 1}`)}">
-          <div class="print-card-body">
-            <strong>${escapeHtml(goal.name || `Ziel ${pageIndex * 4 + index + 1}`)}</strong>
-            <small>${escapeHtml(formatDateTime(goal.capturedAt))}</small>
-            ${place}
-            ${goal.info ? `<p>${escapeHtml(goal.info)}</p>` : ''}
-          </div>
-        </article>`;
-      }).join('');
-      return `<section class="print-page" style="background:${trip.backgroundCss || '#53657a'}">
-        <header class="print-head"><span class="eyebrow">${escapeHtml(categoryLabel(trip.category).toUpperCase())}</span><h1>${escapeHtml(trip.title)}</h1><p>${escapeHtml((trip.participants || []).join(', '))}</p></header>
-        <div class="print-grid">${cards}</div>
-        <div class="print-page-number">Travel Tracker · ${pageIndex + 1}/${chunks.length}</div>
-      </section>`;
-    }).join('');
-
-    document.body.appendChild(printRoot);
-    const images = [...printRoot.querySelectorAll('img')];
-    await Promise.all(images.map(image => image.complete ? Promise.resolve() : new Promise(resolve => {
-      image.addEventListener('load', resolve, { once: true });
-      image.addEventListener('error', resolve, { once: true });
-    })));
-
-    const cleanup = () => {
-      window.removeEventListener('afterprint', cleanup);
-      printRoot.remove();
-    };
-    window.addEventListener('afterprint', cleanup, { once: true });
-    window.print();
-    // Some mobile browsers do not reliably emit afterprint.
-    setTimeout(() => document.body.contains(printRoot) && printRoot.remove(), 60000);
-  }
-
-  async function finishTrip() {
-    const trip = state.currentTrip;
-    if (!trip) return;
-
-    const missing = trip.goals.filter(goal => !goal.photo).length;
-    if (missing) {
-      toast(`Noch ${missing} Ziel${missing === 1 ? '' : 'e'} ohne Foto.`);
-      return;
-    }
-
-    trip.completed = true;
-    await saveCurrentTrip('Tracker abgeschlossen');
-    updateProgress();
-    toast('Tracker abgeschlossen.');
-  }
-
-  function adjustWizardCount(key, delta, min, max, outputId, afterChange = null) {
-    const wizard = state.wizard;
-    wizard[key] = Math.max(min, Math.min(max, wizard[key] + delta));
-    $(outputId).value = String(wizard[key]);
-    afterChange?.();
-  }
-
-  function bindStaticEvents() {
-    $('brandHome').addEventListener('click', async () => {
-      await refreshHome();
-      showScreen('home');
-    });
-
-    document.querySelectorAll('[data-nav]').forEach(button => {
-      button.addEventListener('click', () => showScreen(button.dataset.nav));
-    });
-
-    $('newTripBtn').addEventListener('click', () => { resetWizard(); showScreen('categories'); });
-    $('libraryNewBtn').addEventListener('click', () => { resetWizard(); showScreen('categories'); });
-    $('libraryBtn').addEventListener('click', async () => { await refreshHome(); showScreen('library'); });
-    $('showAllBtn').addEventListener('click', async () => { await refreshHome(); showScreen('library'); });
-
-    $('exportAllBtn').addEventListener('click', exportAll);
-    $('libraryExportBtn').addEventListener('click', exportAll);
-    $('importAllBtn').addEventListener('click', () => $('importPicker').click());
-    $('libraryImportBtn').addEventListener('click', () => $('importPicker').click());
-    $('importPicker').addEventListener('change', async event => {
-      const file = event.target.files?.[0];
-      if (file) await importAllFile(file);
-      event.target.value = '';
-    });
-
-    $('recentTrips').addEventListener('click', handleTripGridClick);
-    $('tripLibrary').addEventListener('click', handleTripGridClick);
-
-    document.querySelectorAll('[data-category]').forEach(button => {
-      button.addEventListener('click', () => {
-        state.wizard.category = button.dataset.category;
-        state.wizard.background = null;
-        renderBackgrounds();
-        showScreen('backgrounds');
-      });
-    });
-
-    $('backgroundGrid').addEventListener('click', event => {
-      const button = event.target.closest('[data-bg-id]');
-      if (!button) return;
-      const items = BACKGROUNDS[state.wizard.category] || BACKGROUNDS.travel;
-      state.wizard.background = items.find(item => item.id === button.dataset.bgId) || items[0];
-      showScreen('setup');
-    });
-
-    $('decreasePeople').addEventListener('click', () => adjustWizardCount('people', -1, 1, 12, 'peopleCount', renderParticipantFields));
-    $('increasePeople').addEventListener('click', () => adjustWizardCount('people', 1, 1, 12, 'peopleCount', renderParticipantFields));
-    $('decreaseGoals').addEventListener('click', () => adjustWizardCount('goalCount', -1, 1, 10, 'goalCount'));
-    $('increaseGoals').addEventListener('click', () => adjustWizardCount('goalCount', 1, 1, 10, 'goalCount'));
-
-    $('participantFields').addEventListener('input', event => {
-      const input = event.target.closest('[data-person-index]');
-      if (!input) return;
-      state.wizard.participants[Number(input.dataset.personIndex)] = input.value;
-    });
-
-    $('continueToLayoutBtn').addEventListener('click', () => {
-      state.wizard.title = $('projectTitle').value.trim();
-      state.wizard.participants = [...$('participantFields').querySelectorAll('input')].map(input => input.value.trim());
-      if (!state.wizard.title) {
-        toast('Bitte gib dem Tracker einen Titel.');
-        $('projectTitle').focus();
-        return;
-      }
-      state.wizard.background ||= backgroundFor(state.wizard.category);
-      renderLayouts();
-      showScreen('layouts');
-    });
-
-    $('layoutGrid').addEventListener('click', async event => {
-      const button = event.target.closest('[data-layout]');
-      if (!button) return;
-      state.wizard.layout = button.dataset.layout;
-      await createTripFromWizard();
-    });
-
-    $('trackerHomeBtn').addEventListener('click', async () => {
-      await saveCurrentTrip();
-      await refreshHome();
-      showScreen('home');
-    });
-    $('saveBtn').addEventListener('click', async () => {
-      if (await saveCurrentTrip('Jetzt gespeichert')) toast('Tracker gespeichert.');
-    });
-    $('finishBtn').addEventListener('click', finishTrip);
-    $('previewTripBtn').addEventListener('click', previewTrip);
-    $('shareFileBtn').addEventListener('click', shareTrip);
-    $('pdfBtn').addEventListener('click', () => void printTrip());
-
-    $('layoutEditBtn').addEventListener('click', () => {
-      state.layoutMode = true;
-      $('layoutEditor').classList.remove('hidden');
-      renderGoals();
-    });
-    $('doneLayoutBtn').addEventListener('click', async () => {
-      state.layoutMode = false;
-      state.selectedGoalIndex = -1;
-      $('layoutEditor').classList.add('hidden');
-      await saveCurrentTrip();
-      renderGoals();
-    });
-    $('rotateLeftBtn').addEventListener('click', () => rotateSelected(-3));
-    $('rotateRightBtn').addEventListener('click', () => rotateSelected(3));
-    $('rotationResetBtn').addEventListener('click', () => setSelectedRotation(0));
-    $('entrySideSelect').addEventListener('change', () => {
-      const goal = state.currentTrip?.goals?.[state.selectedGoalIndex];
-      if (!goal) return;
-      goal.entrySide = $('entrySideSelect').value;
-      drawJourneyPath();
-      void saveCurrentTrip();
-    });
-    $('exitSideSelect').addEventListener('change', () => {
-      const goal = state.currentTrip?.goals?.[state.selectedGoalIndex];
-      if (!goal) return;
-      goal.exitSide = $('exitSideSelect').value;
-      drawJourneyPath();
-      void saveCurrentTrip();
-    });
-    $('lineStyleSelect').addEventListener('change', () => {
-      if (!state.currentTrip) return;
-      state.currentTrip.lineStyle = $('lineStyleSelect').value;
-      drawJourneyPath();
-      void saveCurrentTrip();
-    });
-    $('resetLayoutBtn').addEventListener('click', () => {
-      if (!state.currentTrip) return;
-      const positions = presetPositions(state.currentTrip.goals.length, state.currentTrip.layout || 'zigzag');
-      state.currentTrip.goals.forEach((goal, index) => Object.assign(goal, positions[index]));
-      renderGoals();
-      void saveCurrentTrip();
-    });
-
-    $('goalsCanvas').addEventListener('pointerdown', handleGoalPointerDown);
-    $('goalsCanvas').addEventListener('click', handleGoalClick);
-
-    $('takePhotoBtn').addEventListener('click', () => $('cameraPicker').click());
-    $('choosePhotoBtn').addEventListener('click', () => $('photoPicker').click());
-    $('cameraPicker').addEventListener('change', async event => {
-      await applyPickedPhoto(event.target.files?.[0], 'camera');
-      event.target.value = '';
-    });
-    $('photoPicker').addEventListener('change', async event => {
-      await applyPickedPhoto(event.target.files?.[0], 'library');
-      event.target.value = '';
-    });
-    $('removePhotoBtn').addEventListener('click', removeCurrentGoalPhoto);
-
-    $('pickPlaceBtn').addEventListener('click', openMapPicker);
-    $('removePlaceBtn').addEventListener('click', clearMapSelection);
-    $('mapSearchForm').addEventListener('submit', event => {
-      event.preventDefault();
-      void searchMapPlace();
-    });
-    $('mapSearchResults').addEventListener('click', event => {
-      const button = event.target.closest('[data-result-index]');
-      if (!button) return;
-      const result = $('mapSearchResults')._results?.[Number(button.dataset.resultIndex)];
-      if (!result) return;
-      const lat = Number(result.lat);
-      const lng = Number(result.lon);
-      const label = shortPlaceLabel(result);
-      setMapDraftLocation(lat, lng, label);
-      state.mapInstance?.setView([lat, lng], 16);
-      $('mapSearchStatus').textContent = `Ausgewählt: ${label}`;
-    });
-    $('mapCurrentLocationBtn').addEventListener('click', useCurrentMapPosition);
-    $('mapPickerApplyBtn').addEventListener('click', applyMapPickerSelection);
-    $('mapPickerCancelBtn').addEventListener('click', closeMapPicker);
-    $('mapPickerCloseBtn').addEventListener('click', closeMapPicker);
-    $('mapPickerDialog').addEventListener('close', () => setMapPickerPageLock(false));
-    $('mapPickerDialog').addEventListener('cancel', () => setMapPickerPageLock(false));
-
-    $('goalForm').addEventListener('submit', async event => {
-      if (event.submitter?.value === 'cancel') return;
-      event.preventDefault();
-      await saveGoalFromDialog();
-    });
-    $('goalDialog').addEventListener('close', () => {
-      state.editGoalIndex = -1;
-      state.goalDraftLocation = null;
-      state.mapDraftLocation = null;
-    });
-
-
-    $('confirmActionBtn').addEventListener('click', async event => {
-      event.preventDefault();
-      const action = state.confirmAction;
-      state.confirmAction = null;
-      $('confirmDialog').close();
-      if (action) await action();
-    });
-    $('confirmDialog').addEventListener('close', () => {
-      state.confirmAction = null;
-    });
-
-    window.addEventListener('resize', () => {
-      if (state.currentTrip && $('screenTracker').classList.contains('active')) drawJourneyPath();
-    });
-  }
-
-  async function migrateStoredTrips() {
-    const storedTrips = await db.getAllTrips();
-    const migrations = storedTrips
-      .filter(trip => trip?.schemaVersion !== 5)
-      .map(normalizeTrip)
-      .filter(Boolean);
-
-    if (migrations.length) await db.putTrips(migrations);
-  }
-
-  async function init() {
-    bindStaticEvents();
-    resetWizard();
-    await migrateStoredTrips();
-    await refreshHome();
-  }
-
-  init().catch(error => {
-    console.error(error);
-    toast('Travel Tracker konnte nicht vollständig gestartet werden.');
-  });
+  async function migrateStoredTrips(){const stored=await db.getAllTrips();if(!stored.some(trip=>trip?.schemaVersion!==6))return;const normalized=stored.map(normalizeTrip).filter(Boolean);if(normalized.length)await db.putTrips(normalized);}
+  async function init(){bindEvents();renderParticipantFields();await migrateStoredTrips();await refreshHome();showScreen('home');}
+  init().catch(error=>{console.error(error);toast('Travel Tracker konnte nicht vollständig gestartet werden.');});
 })();
