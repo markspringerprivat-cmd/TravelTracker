@@ -39,3 +39,7 @@ Alle Dateien und den Ordner `assets` in das Repository hochladen. Danach unter *
 „Reise ansehen“ öffnet `viewer.html` als eigenständige Webseite und liest die Reise aus der lokalen IndexedDB desselben Browsers.
 
 „Ansicht teilen“ erzeugt eine eigenständige HTML-Präsentation mit eingebetteten Reisedaten und Fotos. Die Viewer-Darstellung enthält den Vollbild-Slider, die Foto-Lightbox und anklickbare Orts-Chips.
+
+## Karten-Picker: „Meine Position“
+
+Im Karten-Picker gibt es optional **„Meine Position“**. Erst ein ausdrücklicher Tipp auf diesen Button startet die Browser-Standortabfrage. Die Karte springt anschließend zur ermittelten Position und setzt dort einen Marker. Der Ort wird **nicht automatisch gespeichert**; erst **„Diesen Ort übernehmen“** übernimmt ihn in die Station. Der Karten-Dialog selbst ist als fester, nicht scrollbarer Viewport aufgebaut; nur die Karte und die Trefferliste besitzen eigene Interaktion.

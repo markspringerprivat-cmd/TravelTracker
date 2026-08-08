@@ -759,6 +759,80 @@
     }
   }
 
+  function currentPositionErrorMessage(error) {
+    switch (error?.code) {
+      case 1:
+        return 'Der Standortzugriff wurde nicht erlaubt. Du kannst den Ort weiterhin suchen oder direkt auf der Karte auswählen.';
+      case 2:
+        return 'Deine aktuelle Position konnte gerade nicht bestimmt werden. Versuche es erneut oder wähle den Ort auf der Karte.';
+      case 3:
+        return 'Die Standortbestimmung hat zu lange gedauert. Versuche es erneut oder wähle den Ort auf der Karte.';
+      default:
+        return 'Die aktuelle Position konnte nicht ermittelt werden. Du kannst den Ort weiterhin manuell auswählen.';
+    }
+  }
+
+  function useCurrentMapPosition() {
+    const button = $('mapCurrentLocationBtn');
+    if (!navigator.geolocation) {
+      $('mapSearchStatus').textContent = 'Dieser Browser unterstützt keine Standortbestimmung. Du kannst den Ort weiterhin suchen oder auf der Karte auswählen.';
+      return;
+    }
+    if (!window.isSecureContext && location.hostname !== 'localhost') {
+      $('mapSearchStatus').textContent = 'Die aktuelle Position kann nur über eine sichere HTTPS-Verbindung abgefragt werden.';
+      return;
+    }
+
+    button.disabled = true;
+    button.classList.add('is-loading');
+    $('mapSearchStatus').textContent = 'Aktuelle Position wird ermittelt …';
+
+    // Wichtig: Der Geolocation-Aufruf erfolgt direkt aus dem Klick-Handler heraus.
+    navigator.geolocation.getCurrentPosition(position => {
+      const lat = Number(position.coords.latitude);
+      const lng = Number(position.coords.longitude);
+      const accuracy = Number(position.coords.accuracy);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        $('mapSearchStatus').textContent = 'Der Browser hat keine gültigen Koordinaten geliefert.';
+        button.disabled = false;
+        button.classList.remove('is-loading');
+        return;
+      }
+
+      if (ensureMapPicker()) {
+        state.mapInstance.setView([lat, lng], 17, { animate: true });
+      }
+      setMapDraftLocation(lat, lng, 'Aktuelle Position');
+      $('mapSearchResults').innerHTML = '';
+      $('mapSearchResults').classList.add('hidden');
+      const accuracyText = Number.isFinite(accuracy) ? ` (Genauigkeit etwa ±${Math.round(accuracy)} m)` : '';
+      $('mapSearchStatus').textContent = `Position gefunden${accuracyText}. Ortsname wird gesucht …`;
+
+      void reverseMapPoint(lat, lng).finally(() => {
+        button.disabled = false;
+        button.classList.remove('is-loading');
+      });
+    }, error => {
+      $('mapSearchStatus').textContent = currentPositionErrorMessage(error);
+      button.disabled = false;
+      button.classList.remove('is-loading');
+    }, {
+      enableHighAccuracy: true,
+      timeout: 12000,
+      maximumAge: 30000
+    });
+  }
+
+  function setMapPickerPageLock(locked) {
+    document.documentElement.classList.toggle('map-picker-open', locked);
+    document.body.classList.toggle('map-picker-open', locked);
+  }
+
+  function closeMapPicker() {
+    if ($('mapPickerDialog').open) $('mapPickerDialog').close();
+    setMapPickerPageLock(false);
+  }
+
   async function reverseMapPoint(latitude, longitude) {
     $('mapSearchStatus').textContent = 'Ort wird zur Kartenposition gesucht …';
     try {
@@ -824,6 +898,7 @@
       $('mapPickerApplyBtn').disabled = true;
     }
 
+    setMapPickerPageLock(true);
     $('mapPickerDialog').showModal();
 
     requestAnimationFrame(() => {
@@ -847,7 +922,7 @@
     if (!state.mapDraftLocation) return;
     state.goalDraftLocation = normalizeLocation(state.mapDraftLocation);
     renderSelectedPlaceSummary();
-    $('mapPickerDialog').close();
+    closeMapPicker();
   }
 
   async function saveGoalFromDialog() {
@@ -1224,9 +1299,12 @@
       state.mapInstance?.setView([lat, lng], 16);
       $('mapSearchStatus').textContent = `Ausgewählt: ${label}`;
     });
+    $('mapCurrentLocationBtn').addEventListener('click', useCurrentMapPosition);
     $('mapPickerApplyBtn').addEventListener('click', applyMapPickerSelection);
-    $('mapPickerCancelBtn').addEventListener('click', () => $('mapPickerDialog').close());
-    $('mapPickerCloseBtn').addEventListener('click', () => $('mapPickerDialog').close());
+    $('mapPickerCancelBtn').addEventListener('click', closeMapPicker);
+    $('mapPickerCloseBtn').addEventListener('click', closeMapPicker);
+    $('mapPickerDialog').addEventListener('close', () => setMapPickerPageLock(false));
+    $('mapPickerDialog').addEventListener('cancel', () => setMapPickerPageLock(false));
 
     $('goalForm').addEventListener('submit', async event => {
       if (event.submitter?.value === 'cancel') return;

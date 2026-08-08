@@ -142,30 +142,41 @@
   </form>
 </dialog>
 
-<dialog id="mapPickerDialog">
+<dialog id="mapPickerDialog" aria-labelledby="mapPickerTitle">
   <div class="dialog-card map-picker-card">
-    <div class="dialog-head">
-      <div><span class="eyebrow">ORT AUSWÄHLEN</span><h2>Wo war dieses Ziel?</h2></div>
+    <div class="dialog-head map-picker-head">
+      <div><span class="eyebrow">ORT AUSWÄHLEN</span><h2 id="mapPickerTitle">Wo war dieses Ziel?</h2></div>
       <button class="icon-btn" id="mapPickerCloseBtn" type="button" aria-label="Schließen">×</button>
     </div>
-    <p class="dialog-intro">Suche nach einem Ort, zum Beispiel <strong>„Kölner Dom“</strong>, oder tippe direkt auf die gewünschte Stelle der Karte.</p>
-    <form class="map-search-form" id="mapSearchForm">
-      <label class="field-label map-search-label">Ort suchen
-        <div class="map-search-row">
-          <input id="mapSearchInput" type="search" autocomplete="off" maxlength="140" placeholder="z. B. Kölner Dom, Köln">
-          <button class="primary-btn" type="submit">Suchen</button>
-        </div>
-      </label>
-    </form>
-    <div class="map-search-status" id="mapSearchStatus" aria-live="polite"></div>
-    <div class="map-search-results hidden" id="mapSearchResults"></div>
-    <div class="map-picker-map" id="mapPickerMap" aria-label="Interaktive Karte zur Ortsauswahl"></div>
+
+    <div class="map-picker-tools">
+      <p class="dialog-intro">Suche zum Beispiel nach <strong>„Kölner Dom“</strong>, tippe direkt auf die Karte oder springe optional zu deiner aktuellen Position.</p>
+      <form class="map-search-form" id="mapSearchForm">
+        <label class="field-label map-search-label">Ort suchen
+          <div class="map-search-row">
+            <input id="mapSearchInput" type="search" autocomplete="off" maxlength="140" placeholder="z. B. Kölner Dom, Köln">
+            <button class="primary-btn" type="submit">Suchen</button>
+          </div>
+        </label>
+      </form>
+      <div class="map-tool-row">
+        <button class="ghost-btn map-location-btn" id="mapCurrentLocationBtn" type="button"><span aria-hidden="true">◎</span> Meine Position</button>
+        <small>Nur auf deinen ausdrücklichen Tipp; gespeichert wird erst mit „Diesen Ort übernehmen“.</small>
+      </div>
+      <div class="map-search-status" id="mapSearchStatus" aria-live="polite"></div>
+      <div class="map-search-results hidden" id="mapSearchResults"></div>
+    </div>
+
+    <div class="map-picker-map-wrap">
+      <div class="map-picker-map" id="mapPickerMap" aria-label="Interaktive Karte zur Ortsauswahl"></div>
+    </div>
+
     <div class="map-selected-panel" id="mapSelectedPanel">
       <span class="map-selected-pin">⌖</span>
       <div><strong id="mapSelectedTitle">Noch kein Punkt ausgewählt</strong><small id="mapSelectedDetail">Suche einen Ort oder tippe auf die Karte.</small></div>
     </div>
-    <div class="map-attribution-note">Kartendaten © OpenStreetMap-Mitwirkende. Die Ortssuche wird nur ausgelöst, wenn du ausdrücklich auf „Suchen“ drückst.</div>
-    <div class="dialog-actions">
+
+    <div class="dialog-actions map-picker-actions">
       <button class="ghost-btn" id="mapPickerCancelBtn" type="button">Abbrechen</button>
       <button class="primary-btn" id="mapPickerApplyBtn" type="button" disabled>Diesen Ort übernehmen</button>
     </div>
