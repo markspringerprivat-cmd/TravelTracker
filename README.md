@@ -1,22 +1,26 @@
 # Travel Tracker
 
-Statischer Prototyp für GitHub Pages (HTML, CSS, JavaScript).
+Statische Web-App für GitHub Pages. Keine Serverkomponente erforderlich.
 
-## Funktionen
-- Kategorien Reise, Wandern und Geburtstag
-- verschiedene Hintergründe und Startlayouts
-- 1–10 frei benennbare Ziele
-- lokale dauerhafte Speicherung über IndexedDB
-- getrennte Fotoaktionen: **Foto machen** (Kamera auf unterstützten Smartphones) und **Foto auswählen** (Fotomediathek/Dateien)
-- Fotos werden nach Auswahl/Aufnahme sofort dem Ziel zugeordnet und lokal gespeichert
-- freier Layout-Editor: Kacheln verschieben und drehen
-- konfigurierbare Verbindungslinien
-- randloser PDF-Export
-- interaktive teilbare HTML-Ansicht; Fotos lassen sich per Klick/Tipp groß in einer Lightbox öffnen und wieder schließen
-- Export/Import aller Tracker inklusive Fotos als `.traveltracker`-Sicherung
-- responsive Oberfläche für Smartphone und Desktop
+## Neu in dieser Version
+
+- lokale Speicherung aller Tracker und Fotos über IndexedDB
+- Teilnehmer/Namen pro Tracker
+- pro Ziel: Foto, Titel, automatisch gesetzter und editierbarer Zeitpunkt, optionaler Informationstext
+- getrennte Aktionen „Foto machen“ und „Foto auswählen“
+- optionale Standorterfassung mit eigener Erklärung vor der Browser-Berechtigungsabfrage
+- GPS-Koordinaten werden nur nach Zustimmung im lokalen Tracker gespeichert
+- Luftlinienentfernung zwischen zwei Zielen, wenn beide Ziele Standortdaten besitzen
+- Distanzanzeige an den Verbindungslinien
+- animierte, selbstständige HTML-Präsentation zum Teilen mit Willkommen-Seite, Ziel-für-Ziel-Navigation, Wischgesten und Foto-Lightbox
+- PDF-Export, Bibliotheks-Export und -Import
+
+## Standort
+
+Die Geolocation-API funktioniert in normalen Browsern nur in einem sicheren Kontext, z. B. über HTTPS. GitHub Pages stellt HTTPS bereit. Die App liest nicht automatisch GPS-Metadaten aus hochgeladenen Fotos aus. Stattdessen wird – nach einer erklärenden Abfrage und ausdrücklicher Zustimmung – der aktuelle Gerätestandort erfasst.
+
+Die angezeigte Entfernung ist die Luftlinie zwischen den gespeicherten GPS-Punkten, nicht die tatsächlich gelaufene oder gefahrene Strecke.
 
 ## GitHub Pages
-Den Inhalt dieses Ordners in ein Repository hochladen und unter **Settings → Pages** die Veröffentlichung aus dem gewünschten Branch aktivieren.
 
-Hinweis: Die Daten des normalen Trackers liegen lokal im jeweiligen Browser. Die geteilte HTML-Datei enthält die fertige Erinnerung inklusive Fotos und kann ohne Travel-Tracker-Datenbank geöffnet werden.
+Repository zu GitHub hochladen und unter **Settings → Pages** die Bereitstellung aus dem Hauptbranch/root aktivieren.
