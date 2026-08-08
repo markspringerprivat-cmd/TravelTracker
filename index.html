@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#101827">
   <title>Travel Tracker</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -28,7 +29,6 @@
         <button class="menu-tile" id="libraryBtn" type="button"><span class="tile-icon">▦</span><span><strong>Meine Tracker</strong><small id="libraryCount">Noch keine gespeicherten Tracker</small></span></button>
         <button class="menu-tile" id="exportAllBtn" type="button"><span class="tile-icon">⇩</span><span><strong>Alle exportieren</strong><small>Komplette Bibliothek als Sicherungsdatei</small></span></button>
         <button class="menu-tile" id="importAllBtn" type="button"><span class="tile-icon">⇧</span><span><strong>Sicherung importieren</strong><small>Exportierte Tracker wiederherstellen</small></span></button>
-        <button class="menu-tile" id="locationSettingsBtn" type="button"><span class="tile-icon">⌖</span><span><strong>Standort für Kamera-Fotos</strong><small id="locationTileStatus">Noch nicht eingerichtet</small></span></button>
       </div>
       <section class="recent-section">
         <div class="section-title"><div><span class="eyebrow">SCHNELLZUGRIFF</span><h2>Zuletzt bearbeitet</h2></div><button class="text-btn" id="showAllBtn" type="button">Alle anzeigen →</button></div>
@@ -63,7 +63,7 @@
       <div class="step-header"><button class="back-btn" data-nav="backgrounds" type="button">← Zurück</button><span class="eyebrow">3 / 4</span></div>
       <div class="hero compact"><h1>Tracker einrichten</h1><p>Gib deinem Erlebnis einen Namen, trage die Mitreisenden ein und bestimme 1 bis 10 Ziele.</p></div>
       <div class="setup-card">
-        <label class="field-label">Titel<input id="projectTitle" type="text" maxlength="60" placeholder="z. B. Australien"></label>
+        <label class="field-label">Titel<input id="projectTitle" type="text" maxlength="60" placeholder="z. B. Köln-Wochenende"></label>
         <div class="field-label">Wie viele Personen sind dabei?<div class="counter"><button id="decreasePeople" type="button">−</button><output id="peopleCount">1</output><button id="increasePeople" type="button">＋</button></div></div>
         <div class="participant-fields" id="participantFields"></div>
         <div class="field-label">Anzahl der Ziele<div class="counter"><button id="decreaseGoals" type="button">−</button><output id="goalCount">6</output><button id="increaseGoals" type="button">＋</button></div></div>
@@ -118,38 +118,63 @@
     <div class="dialog-head"><div><span class="eyebrow">ZIEL BEARBEITEN</span><h2 id="dialogTitle">Ziel 1</h2></div><button class="icon-btn" value="cancel" type="submit">×</button></div>
     <div class="photo-preview" id="dialogPhotoPreview"><span>Noch kein Foto</span></div>
     <div class="photo-action-grid"><button class="primary-btn" id="takePhotoBtn" type="button"><span><strong>Foto machen</strong><small>Kamera öffnen und direkt aufnehmen</small></span></button><button class="ghost-btn" id="choosePhotoBtn" type="button"><span><strong>Foto auswählen</strong><small>Aus Fotos oder Dateien auswählen</small></span></button></div>
-    <div class="capture-location-note" id="captureLocationNote"></div>
     <button class="text-danger-btn" id="removePhotoBtn" type="button">Foto entfernen</button>
-    <label class="field-label">Was war das Ziel?<input id="goalNameInput" type="text" maxlength="70" placeholder="z. B. Sydney Opera House"></label>
+    <label class="field-label">Was war das Ziel?<input id="goalNameInput" type="text" maxlength="70" placeholder="z. B. Kölner Dom"></label>
     <label class="field-label">Zeitpunkt<input id="goalTimeInput" type="datetime-local"></label>
     <label class="field-label">Informationstext (optional)<textarea id="goalInfoInput" maxlength="800" rows="4" placeholder="Was ist hier passiert? Was möchtest du zu diesem Moment festhalten?"></textarea></label>
-
     <section class="maps-box">
-      <div class="maps-head"><div><span class="eyebrow">ORT / GOOGLE MAPS</span><strong>Ort zur Station speichern</strong></div><span class="maps-badge" id="mapsModeBadge">manuell</span></div>
-      <label class="field-label">Ort oder Sehenswürdigkeit<input id="placeNameInput" type="text" maxlength="120" placeholder="z. B. Sydney Opera House, Sydney"></label>
-      <div class="maps-actions"><button class="ghost-btn" id="showMapPreviewBtn" type="button">Kartenvorschau</button><a class="ghost-btn anchor-btn" id="openMapsSearchLink" href="https://www.google.com/maps" target="_blank" rel="noopener">In Google Maps öffnen</a></div>
-      <div class="map-preview hidden" id="mapPreviewWrap"><iframe id="mapPreviewFrame" title="Google-Maps-Vorschau" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe><small>Die Vorschau dient zur Orientierung. Für eine eindeutige Auswahl ohne Google-API-Key speichert Travel Tracker den eingegebenen Ortsnamen bzw. einen optionalen Maps-Link.</small></div>
-      <label class="field-label">Google-Maps-Link (optional)<input id="mapsUrlInput" type="url" placeholder="https://maps.google.com/... oder https://www.google.com/maps/..."></label>
-      <button class="text-danger-btn hidden" id="removePlaceBtn" type="button">Ort entfernen</button>
+      <div class="maps-head">
+        <div><span class="eyebrow">ORT</span><strong>Ort zur Station hinzufügen</strong></div>
+        <span class="maps-badge">Karte</span>
+      </div>
+      <p class="maps-copy">Wähle den Ort direkt auf einer Karte aus. Du kannst zum Beispiel nach <strong>„Kölner Dom“</strong> suchen oder einen Punkt auf der Karte antippen.</p>
+      <div class="selected-place" id="selectedPlaceSummary">
+        <span class="selected-place-icon">⌖</span>
+        <div><strong>Noch kein Ort ausgewählt</strong><small>Der Ort ist optional.</small></div>
+      </div>
+      <div class="maps-actions">
+        <button class="ghost-btn" id="pickPlaceBtn" type="button">Ort auswählen</button>
+        <button class="text-danger-btn hidden" id="removePlaceBtn" type="button">Ort entfernen</button>
+      </div>
     </section>
 
     <button class="save-btn" id="saveGoalBtn" value="default" type="submit">Übernehmen</button>
   </form>
 </dialog>
 
-<dialog id="locationDialog">
-  <div class="dialog-card location-dialog-card">
-    <div class="dialog-head"><div><span class="eyebrow">STANDORT FÜR FOTOS</span><h2>Aufnahmeort automatisch speichern?</h2></div><button class="icon-btn" id="locationCloseBtn" type="button" aria-label="Schließen">×</button></div>
-    <p class="dialog-intro">Wenn du diese Funktion aktivierst, fragt dein Browser nach Standortzugriff. Bei Fotos, die du direkt über <strong>„Foto machen“</strong> aufnimmst, speichert Travel Tracker die Koordinaten separat beim Ziel und erstellt automatisch einen Google-Maps-Link zum Aufnahmeort.</p>
-    <div class="privacy-note"><strong>Die Koordinaten bleiben lokal im Tracker.</strong><span>Sie werden nicht in das Foto hineingeschrieben und nicht automatisch an einen Server übertragen. Beim Teilen einer Reise werden sie nur als Google-Maps-Link Teil der geteilten Reise.</span></div>
-    <div class="permission-panel" id="locationPermissionPanel"><strong id="locationPermissionHeadline">Status wird geprüft …</strong><span id="locationPermissionText"></span></div>
-    <div class="location-help hidden" id="locationHelp"></div>
-    <div class="dialog-actions location-actions"><button class="ghost-btn" id="disableLocationBtn" type="button">Nicht verwenden</button><button class="primary-btn" id="enableLocationBtn" type="button">Standort aktivieren</button></div>
+<dialog id="mapPickerDialog">
+  <div class="dialog-card map-picker-card">
+    <div class="dialog-head">
+      <div><span class="eyebrow">ORT AUSWÄHLEN</span><h2>Wo war dieses Ziel?</h2></div>
+      <button class="icon-btn" id="mapPickerCloseBtn" type="button" aria-label="Schließen">×</button>
+    </div>
+    <p class="dialog-intro">Suche nach einem Ort, zum Beispiel <strong>„Kölner Dom“</strong>, oder tippe direkt auf die gewünschte Stelle der Karte.</p>
+    <form class="map-search-form" id="mapSearchForm">
+      <label class="field-label map-search-label">Ort suchen
+        <div class="map-search-row">
+          <input id="mapSearchInput" type="search" autocomplete="off" maxlength="140" placeholder="z. B. Kölner Dom, Köln">
+          <button class="primary-btn" type="submit">Suchen</button>
+        </div>
+      </label>
+    </form>
+    <div class="map-search-status" id="mapSearchStatus" aria-live="polite"></div>
+    <div class="map-search-results hidden" id="mapSearchResults"></div>
+    <div class="map-picker-map" id="mapPickerMap" aria-label="Interaktive Karte zur Ortsauswahl"></div>
+    <div class="map-selected-panel" id="mapSelectedPanel">
+      <span class="map-selected-pin">⌖</span>
+      <div><strong id="mapSelectedTitle">Noch kein Punkt ausgewählt</strong><small id="mapSelectedDetail">Suche einen Ort oder tippe auf die Karte.</small></div>
+    </div>
+    <div class="map-attribution-note">Kartendaten © OpenStreetMap-Mitwirkende. Die Ortssuche wird nur ausgelöst, wenn du ausdrücklich auf „Suchen“ drückst.</div>
+    <div class="dialog-actions">
+      <button class="ghost-btn" id="mapPickerCancelBtn" type="button">Abbrechen</button>
+      <button class="primary-btn" id="mapPickerApplyBtn" type="button" disabled>Diesen Ort übernehmen</button>
+    </div>
   </div>
 </dialog>
 
 <dialog id="confirmDialog"><form method="dialog" class="dialog-card confirm-card"><h2 id="confirmTitle">Tracker löschen?</h2><p id="confirmText">Diese Aktion kann nicht rückgängig gemacht werden.</p><div class="dialog-actions"><button class="ghost-btn" value="cancel">Abbrechen</button><button class="danger-btn" id="confirmActionBtn" value="default">Löschen</button></div></form></dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="core.js"></script>
 <script src="app.js"></script>
 </body>

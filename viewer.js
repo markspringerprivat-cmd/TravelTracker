@@ -8,6 +8,7 @@
     db,
     escapeHtml,
     formatDateTime,
+    mapsCoordinatesUrl,
     normalizeMapsUrl
   } = Core;
 
@@ -61,13 +62,22 @@
   }
 
   function locationLink(goal) {
-    const label = String(goal?.location?.label || '').trim();
-    const customUrl = String(goal?.location?.mapsUrl || '').trim();
-    if (!label && !customUrl) return '';
+    const locationData = goal?.location;
+    if (!locationData) return '';
 
-    const href = normalizeMapsUrl(customUrl, label);
-    const text = label || 'Standort anzeigen';
-    return `<a class="location-chip" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text)}</a>`;
+    const label = String(locationData.label || '').trim();
+    const latitude = Number(locationData.latitude);
+    const longitude = Number(locationData.longitude);
+    const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude);
+    const customUrl = String(locationData.mapsUrl || '').trim();
+
+    if (!label && !hasCoordinates && !customUrl) return '';
+
+    const href = hasCoordinates
+      ? mapsCoordinatesUrl(latitude, longitude)
+      : normalizeMapsUrl(customUrl, label);
+    const text = label || 'Ort in Google Maps ansehen';
+    return `<a class="location-chip" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(text)} in Google Maps öffnen">${escapeHtml(text)}</a>`;
   }
 
   function renderSlide(goal, index) {

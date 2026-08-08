@@ -183,59 +183,6 @@
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat.toFixed(7)},${lng.toFixed(7)}`)}`;
   }
 
-  async function getGeolocationPermissionState() {
-    if (!('geolocation' in navigator)) return 'unsupported';
-    if (!navigator.permissions?.query) return 'unknown';
-    try {
-      const result = await navigator.permissions.query({ name: 'geolocation' });
-      return result?.state || 'unknown';
-    } catch {
-      return 'unknown';
-    }
-  }
-
-  function getCurrentLocation(options = {}) {
-    return new Promise((resolve, reject) => {
-      if (!window.isSecureContext) {
-        const error = new Error('Standortzugriff ist nur über eine sichere HTTPS-Verbindung möglich.');
-        error.kind = 'insecure';
-        reject(error);
-        return;
-      }
-      if (!navigator.geolocation) {
-        const error = new Error('Dieser Browser unterstützt keinen Standortzugriff.');
-        error.kind = 'unsupported';
-        reject(error);
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        position => resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          timestamp: position.timestamp || Date.now()
-        }),
-        geoError => {
-          const error = new Error(
-            geoError.code === 1 ? 'Standortberechtigung wurde verweigert.' :
-            geoError.code === 2 ? 'Der aktuelle Standort ist nicht verfügbar.' :
-            geoError.code === 3 ? 'Die Standortabfrage hat zu lange gedauert.' :
-            'Der Standort konnte nicht ermittelt werden.'
-          );
-          error.kind = geoError.code === 1 ? 'denied' : geoError.code === 2 ? 'unavailable' : geoError.code === 3 ? 'timeout' : 'unknown';
-          error.code = geoError.code;
-          reject(error);
-        },
-        {
-          enableHighAccuracy: options.enableHighAccuracy ?? true,
-          timeout: options.timeout ?? 15000,
-          maximumAge: options.maximumAge ?? 0
-        }
-      );
-    });
-  }
-
   function slugify(value) {
     return String(value || 'reise')
       .toLowerCase()
@@ -276,8 +223,6 @@
     mapsSearchUrl,
     mapsCoordinatesUrl,
     normalizeMapsUrl,
-    getGeolocationPermissionState,
-    getCurrentLocation,
     slugify,
     downloadBlob
   });

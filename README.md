@@ -1,38 +1,41 @@
 # Travel Tracker
 
-Statische Web-App für GitHub Pages.
+Statische GitHub-Pages-App zum Planen und Festhalten von Reisen, Wanderungen und Geburtstagen.
 
 ## Dateien
-- `index.html` – Haupt-App zum Erstellen und Bearbeiten
-- `styles.css` – Haupt-App-Design
-- `app.js` – lokale Speicherung, Editor, Export/Import, Teilen
-- `viewer.html` – eigene Reise-Präsentationsseite
-- `viewer.css` – Vollbild-Slider
-- `viewer.js` – Viewer-Logik
-- `assets/` – lokale Hintergrundbilder
+
+- `index.html` – Haupt-App
+- `styles.css` – Oberfläche der Haupt-App
+- `app.js` – Erstellung, Bearbeitung, Export/Import und Karten-Picker
+- `core.js` – gemeinsame Datenbank- und Hilfsfunktionen
+- `viewer.html` – eigenständige Reiseansicht
+- `viewer.css` – Vollbild-Viewer
+- `viewer.js` – Slider, Lightbox und Google-Maps-Verknüpfung
+- `assets/` – lokale Bildressourcen
+
+## Lokale Speicherung
+
+Tracker und Fotos werden in IndexedDB im Browser gespeichert. Über „Alle exportieren“ kann die gesamte lokale Bibliothek als `.traveltracker`-Datei gesichert und später wieder importiert werden.
+
+## Ort auswählen – ohne GPS-Berechtigung
+
+Travel Tracker fragt **keinen Geräte-Standort** ab und verwendet keine Browser-Geolocation.
+
+Beim Bearbeiten eines Ziels gibt es stattdessen den Button **„Ort auswählen“**:
+
+1. Im Karten-Picker nach einem Ort suchen, z. B. `Kölner Dom, Köln`, oder direkt auf die Karte tippen.
+2. Der gewünschte Punkt wird mit einem Marker markiert.
+3. Mit **„Diesen Ort übernehmen“** werden Ortsname und Koordinaten beim Ziel gespeichert.
+4. In der Reiseansicht erscheint der Ort als anklickbarer Chip. Daraus erzeugt Travel Tracker automatisch einen Google-Maps-Link zu den gespeicherten Koordinaten.
+
+Die interaktive Karte verwendet Leaflet und OpenStreetMap-Kartenkacheln. Die Textsuche verwendet für diesen Prototyp die öffentliche Nominatim-Suche und wird nur nach einem ausdrücklichen Klick auf „Suchen“ ausgeführt; es gibt kein Autocomplete.
 
 ## GitHub Pages
-Alle Dateien aus dem ZIP in das Repository hochladen. Danach unter **Settings → Pages** den Branch (z. B. `main`) und `/root` auswählen.
 
-`Reise ansehen` öffnet `viewer.html?id=<tracker-id>`. Da `index.html` und `viewer.html` dieselbe GitHub-Pages-Domain verwenden, kann der Viewer die lokal gespeicherte Reise aus IndexedDB lesen.
+Alle Dateien und den Ordner `assets` in das Repository hochladen. Danach unter **Settings → Pages** den gewünschten Branch als Quelle auswählen. GitHub Pages stellt die App anschließend über HTTPS bereit.
 
-## Teilen
-`Ansicht teilen` erzeugt weiterhin eine selbständige HTML-Datei, bettet aber jetzt **denselben Viewer** (CSS + JavaScript) ein. Für einen echten öffentlich teilbaren Web-Link auf ein anderes Gerät wäre später ein Online-Speicher/Backend nötig, weil IndexedDB nur lokal auf dem jeweiligen Browser existiert.
+## Reise ansehen und teilen
 
-## Google Maps
-Der Tracker fragt **keine GPS-Daten** mehr ab. Ein Ort wird manuell eingegeben. Die App kann:
-- eine Google-Maps-Suche in einem neuen Tab öffnen,
-- eine Kartenvorschau im Bearbeitungsdialog anzeigen,
-- einen Google-Maps-Link zur Station speichern,
-- den Ort später im Viewer als anklickbaren Chip anzeigen.
+„Reise ansehen“ öffnet `viewer.html` als eigenständige Webseite und liest die Reise aus der lokalen IndexedDB desselben Browsers.
 
-Für einen echten eingebetteten Places-Picker mit Autocomplete und Rückgabe einer eindeutigen Place-ID wäre ein Google-Maps-Platform-API-Key erforderlich.
-
-
-## Standort für Kamera-Fotos
-Travel Tracker kann optional den Geräte-Standort erfassen, wenn ein Foto direkt über „Foto machen“ aufgenommen wird. Die Berechtigung wird nach einer eigenen Erklärung durch die native Browser-Abfrage angefordert. Die Koordinaten werden separat beim Ziel gespeichert und in einen Google-Maps-Link umgewandelt. Für hochgeladene bestehende Fotos wird nicht der aktuelle Standort verwendet.
-
-Die Funktion benötigt HTTPS (GitHub Pages erfüllt das). Sie kann im Hauptmenü jederzeit ein- oder ausgeschaltet werden.
-
-## PDF
-Die PDF-Aktion verwendet kein neues Pop-up-Fenster mehr. Stattdessen wird innerhalb der aktuellen Seite eine druckoptimierte A4-Ansicht erzeugt und der native Druck-/PDF-Dialog des Browsers geöffnet.
+„Ansicht teilen“ erzeugt eine eigenständige HTML-Präsentation mit eingebetteten Reisedaten und Fotos. Die Viewer-Darstellung enthält den Vollbild-Slider, die Foto-Lightbox und anklickbare Orts-Chips.

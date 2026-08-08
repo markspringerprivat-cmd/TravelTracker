@@ -16,8 +16,6 @@
     formatDateTime,
     mapsCoordinatesUrl,
     normalizeMapsUrl,
-    getGeolocationPermissionState,
-    getCurrentLocation,
     slugify,
     downloadBlob
   } = Core;
@@ -54,7 +52,6 @@
 
   const $ = id => document.getElementById(id);
   const screens = [...document.querySelectorAll('.screen')];
-  const LOCATION_PREF_KEY = 'travelTracker:autoLocation';
 
   const state = {
     currentTrip: null,
@@ -64,8 +61,12 @@
     confirmAction: null,
     dragFinishedAt: 0,
     viewerAssetsPromise: null,
-    locationOnboarding: false,
-    locationStatus: 'unknown',
+    goalDraftLocation: null,
+    mapDraftLocation: null,
+    mapInstance: null,
+    mapMarker: null,
+    geocodeController: null,
+    lastGeocodeAt: 0,
     wizard: createInitialWizard()
   };
 
@@ -111,20 +112,19 @@
 
     const label = String(location.label || '').trim();
     const rawMapsUrl = String(location.mapsUrl || '').trim();
-    const latitude = Number(location.latitude);
-    const longitude = Number(location.longitude);
-    const accuracy = Number(location.accuracy);
+    const latitude = Number(location.latitude ?? location.lat);
+    const longitude = Number(location.longitude ?? location.lng);
     const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude);
+
     if (!label && !rawMapsUrl && !hasCoordinates) return null;
 
     return {
-      source: location.source === 'gps' && hasCoordinates ? 'gps' : 'manual',
-      label: label || (hasCoordinates ? 'Aufnahmeort' : 'Standort anzeigen'),
-      mapsUrl: hasCoordinates ? mapsCoordinatesUrl(latitude, longitude) : normalizeMapsUrl(rawMapsUrl, label),
+      label: label || 'Ausgewählter Ort',
       latitude: hasCoordinates ? latitude : null,
       longitude: hasCoordinates ? longitude : null,
-      accuracy: Number.isFinite(accuracy) ? accuracy : null,
-      capturedAt: location.capturedAt || null
+      mapsUrl: hasCoordinates
+        ? mapsCoordinatesUrl(latitude, longitude)
+        : normalizeMapsUrl(rawMapsUrl, label)
     };
   }
 
@@ -166,7 +166,7 @@
     return {
       ...rawTrip,
       id: rawTrip.id || createId(),
-      schemaVersion: 4,
+      schemaVersion: 5,
       title: String(rawTrip.title || `${categoryLabel(category)} ${new Date().toLocaleDateString('de-DE')}`).trim(),
       category,
       backgroundId: rawTrip.backgroundId || fallbackBackground.id,
@@ -183,176 +183,6 @@
     };
   }
 
-
-  function getLocationPreference() {
-    const value = localStorage.getItem(LOCATION_PREF_KEY);
-    return value === 'enabled' || value === 'disabled' ? value : null;
-  }
-
-  function setLocationPreference(value) {
-    if (value === 'enabled' || value === 'disabled') localStorage.setItem(LOCATION_PREF_KEY, value);
-    else localStorage.removeItem(LOCATION_PREF_KEY);
-    updateLocationTile();
-    updateCaptureLocationNote();
-  }
-
-  function platformHelpText() {
-    const ua = navigator.userAgent || '';
-    if (/iPhone|iPad|iPod/i.test(ua)) {
-      return '<strong>iPhone/iPad:</strong> Öffne die Seite in Safari. Falls der Standort blockiert ist: Seitenmenü/„aA“ → Website-Einstellungen → Standort → Erlauben oder Fragen. Prüfe außerdem Einstellungen → Datenschutz & Sicherheit → Ortungsdienste.';
-    }
-    if (/Android/i.test(ua)) {
-      return '<strong>Android:</strong> In Chrome: Symbol links neben der Adresse → Berechtigungen → Standort → Zulassen. Prüfe außerdem, ob die Ortungsdienste des Geräts eingeschaltet sind.';
-    }
-    return '<strong>Browser-Einstellungen:</strong> Erlaube dieser Website den Zugriff auf den Standort und prüfe, ob die Ortungsdienste des Geräts aktiviert sind.';
-  }
-
-  async function refreshLocationPermissionStatus() {
-    state.locationStatus = await getGeolocationPermissionState();
-    updateLocationTile();
-    renderLocationPermissionState();
-    return state.locationStatus;
-  }
-
-  function updateLocationTile() {
-    const element = $('locationTileStatus');
-    if (!element) return;
-    const pref = getLocationPreference();
-    if (pref === 'disabled') {
-      element.textContent = 'Ausgeschaltet · nur manuelle Orte';
-      return;
-    }
-    if (pref !== 'enabled') {
-      element.textContent = 'Noch nicht eingerichtet';
-      return;
-    }
-    if (state.locationStatus === 'granted') element.textContent = 'Aktiv · Aufnahmeort wird automatisch gespeichert';
-    else if (state.locationStatus === 'denied') element.textContent = 'Aktiv gewünscht · im Browser blockiert';
-    else element.textContent = 'Aktiv · Browserberechtigung wird bei Bedarf geprüft';
-  }
-
-  function updateCaptureLocationNote(message = '', type = '') {
-    const element = $('captureLocationNote');
-    if (!element) return;
-    element.classList.remove('active', 'error');
-    if (message) {
-      element.textContent = message;
-      if (type) element.classList.add(type);
-      return;
-    }
-    if (getLocationPreference() === 'enabled') {
-      element.textContent = 'Automatischer Aufnahmeort ist aktiv: Bei „Foto machen“ wird nach der Aufnahme der Standort gespeichert und ein Google-Maps-Link erzeugt.';
-      element.classList.add('active');
-    } else {
-      element.textContent = 'Automatischer Aufnahmeort ist aus. Du kannst unten weiterhin einen Ort manuell über Google Maps speichern.';
-    }
-  }
-
-  function renderLocationPermissionState() {
-    const panel = $('locationPermissionPanel');
-    if (!panel) return;
-    const headline = $('locationPermissionHeadline');
-    const text = $('locationPermissionText');
-    const help = $('locationHelp');
-    panel.classList.remove('good', 'warn', 'bad');
-    help.classList.add('hidden');
-
-    if (!window.isSecureContext) {
-      panel.classList.add('bad');
-      headline.textContent = 'HTTPS ist erforderlich';
-      text.textContent = 'Öffne Travel Tracker über die HTTPS-Adresse deiner GitHub-Pages-Seite.';
-      return;
-    }
-    if (!navigator.geolocation) {
-      panel.classList.add('bad');
-      headline.textContent = 'Standort nicht unterstützt';
-      text.textContent = 'Dieser Browser stellt Travel Tracker keinen Standortzugriff bereit.';
-      return;
-    }
-    if (state.locationStatus === 'granted') {
-      panel.classList.add('good');
-      headline.textContent = 'Standort ist erlaubt';
-      text.textContent = 'Kamera-Fotos können automatisch mit ihrem Aufnahmeort verknüpft werden.';
-      return;
-    }
-    if (state.locationStatus === 'denied') {
-      panel.classList.add('bad');
-      headline.textContent = 'Standort ist im Browser blockiert';
-      text.textContent = 'Die Website darf den Standort aktuell nicht abrufen. Ändere die Website-Berechtigung und teste danach erneut.';
-      help.innerHTML = platformHelpText();
-      help.classList.remove('hidden');
-      return;
-    }
-    panel.classList.add('warn');
-    headline.textContent = state.locationStatus === 'prompt' ? 'Browserabfrage noch offen' : 'Berechtigungsstatus wird beim Aktivieren geprüft';
-    text.textContent = 'Tippe auf „Standort aktivieren“. Danach sollte die normale Standortabfrage deines Browsers erscheinen.';
-  }
-
-  async function openLocationDialog({ onboarding = false } = {}) {
-    state.locationOnboarding = onboarding;
-    $('locationCloseBtn').classList.toggle('hidden', onboarding);
-    $('locationDialog').showModal();
-    await refreshLocationPermissionStatus();
-  }
-
-  function enableLocationFromDialog() {
-    setLocationPreference('enabled');
-    // Close our dialog synchronously, then immediately trigger the native browser request
-    // from the same click handler. This is the most reliable flow on mobile browsers.
-    $('locationDialog').close();
-    const request = getCurrentLocation({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-    request.then(position => {
-      state.locationStatus = 'granted';
-      updateLocationTile();
-      toast(`Standort aktiviert · Genauigkeit ca. ±${Math.round(position.accuracy || 0)} m`);
-    }).catch(error => {
-      state.locationStatus = error.kind === 'denied' ? 'denied' : state.locationStatus;
-      updateLocationTile();
-      toast(error.message || 'Standort konnte nicht aktiviert werden.');
-      if (error.kind === 'denied' || error.kind === 'insecure') {
-        setTimeout(() => openLocationDialog({ onboarding: false }), 100);
-      }
-    });
-  }
-
-  function disableLocationFromDialog() {
-    setLocationPreference('disabled');
-    $('locationDialog').close();
-    toast('Automatische Standorterfassung ist ausgeschaltet.');
-  }
-
-  async function captureLocationForGoal(goal) {
-    if (!goal || getLocationPreference() !== 'enabled') return false;
-    updateCaptureLocationNote('Foto gespeichert. Aufnahmeort wird ermittelt …', 'active');
-    try {
-      const position = await getCurrentLocation({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-      goal.location = {
-        source: 'gps',
-        label: 'Aufnahmeort',
-        mapsUrl: mapsCoordinatesUrl(position.latitude, position.longitude),
-        latitude: position.latitude,
-        longitude: position.longitude,
-        accuracy: position.accuracy,
-        capturedAt: new Date(position.timestamp || Date.now()).toISOString()
-      };
-      state.locationStatus = 'granted';
-      $('placeNameInput').value = goal.location.label;
-      $('mapsUrlInput').value = goal.location.mapsUrl;
-      $('mapsModeBadge').textContent = 'automatisch';
-      updateMapsControls();
-      updateCaptureLocationNote(`Aufnahmeort gespeichert · Genauigkeit ca. ±${Math.round(position.accuracy || 0)} m`, 'active');
-      await saveCurrentTrip('Foto und Aufnahmeort gespeichert');
-      renderGoals();
-      updateLocationTile();
-      return true;
-    } catch (error) {
-      if (error.kind === 'denied') state.locationStatus = 'denied';
-      updateLocationTile();
-      updateCaptureLocationNote(`Foto gespeichert, Standort aber nicht: ${error.message}`, 'error');
-      toast(`Foto gespeichert · ${error.message}`);
-      return false;
-    }
-  }
 
   function showScreen(name) {
     const targetId = `screen${name[0].toUpperCase()}${name.slice(1)}`;
@@ -505,7 +335,7 @@
 
     state.currentTrip = {
       id: createId(),
-      schemaVersion: 4,
+      schemaVersion: 5,
       title: wizard.title || `${categoryLabel(wizard.category)} ${new Date().toLocaleDateString('de-DE')}`,
       category: wizard.category,
       backgroundId: wizard.background?.id || fallbackBackground.id,
@@ -747,15 +577,10 @@
     $('goalNameInput').value = goal.name || '';
     $('goalTimeInput').value = toLocalDateTimeInput(goal.capturedAt);
     $('goalInfoInput').value = goal.info || '';
-    $('placeNameInput').value = goal.location?.label || '';
-    $('mapsUrlInput').value = goal.location?.mapsUrl || '';
-    $('mapPreviewWrap').classList.add('hidden');
-    $('mapPreviewFrame').src = 'about:blank';
-    $('mapsModeBadge').textContent = goal.location?.source === 'gps' ? 'automatisch' : 'manuell';
-    updateCaptureLocationNote();
+    state.goalDraftLocation = normalizeLocation(goal.location);
+    renderSelectedPlaceSummary();
     renderDialogPhoto(goal.photo);
     updatePhotoRemoveButton(goal.photo);
-    updateMapsControls();
     $('goalDialog').showModal();
   }
 
@@ -786,9 +611,6 @@
       renderGoals();
       await saveCurrentTrip('Foto gespeichert');
 
-      if (source === 'camera' && getLocationPreference() === 'enabled') {
-        await captureLocationForGoal(goal);
-      }
     } catch (error) {
       console.error(error);
       toast('Foto konnte nicht gespeichert werden.');
@@ -806,53 +628,236 @@
     await saveCurrentTrip('Foto entfernt');
   }
 
-  function updateMapsControls() {
-    const place = $('placeNameInput').value.trim();
-    const customUrl = $('mapsUrlInput').value.trim();
-    $('openMapsSearchLink').href = normalizeMapsUrl(customUrl, place);
-    $('removePlaceBtn').classList.toggle('hidden', !place && !customUrl);
-  }
+  function renderSelectedPlaceSummary() {
+    const location = normalizeLocation(state.goalDraftLocation);
+    const summary = $('selectedPlaceSummary');
+    const removeButton = $('removePlaceBtn');
 
-  function showMapPreview() {
-    const place = $('placeNameInput').value.trim();
-    if (!place) {
-      toast('Bitte zuerst einen Ort eingeben.');
-      $('placeNameInput').focus();
+    if (!location) {
+      summary.innerHTML = '<span class="selected-place-icon">⌖</span><div><strong>Noch kein Ort ausgewählt</strong><small>Der Ort ist optional.</small></div>';
+      removeButton.classList.add('hidden');
+      $('pickPlaceBtn').textContent = 'Ort auswählen';
       return;
     }
 
-    $('mapPreviewFrame').src = `https://www.google.com/maps?q=${encodeURIComponent(place)}&output=embed`;
-    $('mapPreviewWrap').classList.remove('hidden');
+    const coordinates = Number.isFinite(location.latitude) && Number.isFinite(location.longitude)
+      ? `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`
+      : 'Ort gespeichert';
+
+    summary.innerHTML = `<span class="selected-place-icon active">⌖</span><div><strong>${escapeHtml(location.label)}</strong><small>${escapeHtml(coordinates)}</small></div>`;
+    removeButton.classList.remove('hidden');
+    $('pickPlaceBtn').textContent = 'Ort ändern';
   }
 
-  function clearMapFields() {
-    $('placeNameInput').value = '';
-    $('mapsUrlInput').value = '';
-    $('mapPreviewFrame').src = 'about:blank';
-    $('mapPreviewWrap').classList.add('hidden');
-    updateMapsControls();
+  function clearMapSelection() {
+    state.goalDraftLocation = null;
+    renderSelectedPlaceSummary();
+  }
+
+  function shortPlaceLabel(result) {
+    const named = String(result?.namedetails?.name || result?.name || '').trim();
+    if (named) return named;
+    const display = String(result?.display_name || '').trim();
+    if (!display) return 'Ausgewählter Ort';
+    return display.split(',').slice(0, 2).join(',').trim();
+  }
+
+  function setMapDraftLocation(latitude, longitude, label = 'Ausgewählter Ort') {
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    state.mapDraftLocation = {
+      label: String(label || 'Ausgewählter Ort').trim() || 'Ausgewählter Ort',
+      latitude: lat,
+      longitude: lng,
+      mapsUrl: mapsCoordinatesUrl(lat, lng)
+    };
+
+    if (state.mapInstance) {
+      if (!state.mapMarker) {
+        state.mapMarker = window.L.marker([lat, lng]).addTo(state.mapInstance);
+      } else {
+        state.mapMarker.setLatLng([lat, lng]);
+      }
+    }
+
+    $('mapSelectedTitle').textContent = state.mapDraftLocation.label;
+    $('mapSelectedDetail').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    $('mapPickerApplyBtn').disabled = false;
+  }
+
+  async function waitForGeocodeSlot() {
+    const elapsed = Date.now() - state.lastGeocodeAt;
+    if (elapsed < 1050) {
+      await new Promise(resolve => setTimeout(resolve, 1050 - elapsed));
+    }
+    state.lastGeocodeAt = Date.now();
+  }
+
+  async function requestNominatim(path, params) {
+    if (state.geocodeController) state.geocodeController.abort();
+    state.geocodeController = new AbortController();
+    await waitForGeocodeSlot();
+
+    const url = new URL(`https://nominatim.openstreetmap.org/${path}`);
+    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+    const response = await fetch(url, {
+      signal: state.geocodeController.signal,
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) throw new Error('Die Ortssuche ist momentan nicht erreichbar.');
+    return response.json();
+  }
+
+  function renderMapSearchResults(results) {
+    const wrap = $('mapSearchResults');
+    if (!Array.isArray(results) || !results.length) {
+      wrap.innerHTML = '';
+      wrap.classList.add('hidden');
+      $('mapSearchStatus').textContent = 'Kein passender Ort gefunden. Versuche eine genauere Suche oder tippe direkt auf die Karte.';
+      return;
+    }
+
+    wrap.innerHTML = results.map((result, index) => {
+      const label = String(result.display_name || shortPlaceLabel(result));
+      return `<button class="map-result" type="button" data-result-index="${index}">
+        <span class="map-result-pin">⌖</span>
+        <span><strong>${escapeHtml(shortPlaceLabel(result))}</strong><small>${escapeHtml(label)}</small></span>
+      </button>`;
+    }).join('');
+    wrap._results = results;
+    wrap.classList.remove('hidden');
+    $('mapSearchStatus').textContent = `${results.length} Treffer gefunden.`;
+  }
+
+  async function searchMapPlace() {
+    const query = $('mapSearchInput').value.trim();
+    if (!query) {
+      $('mapSearchStatus').textContent = 'Bitte gib zuerst einen Ort ein, zum Beispiel „Kölner Dom“.';
+      $('mapSearchInput').focus();
+      return;
+    }
+
+    $('mapSearchStatus').textContent = 'Ort wird gesucht …';
+    $('mapSearchResults').classList.add('hidden');
+
+    try {
+      const results = await requestNominatim('search', {
+        format: 'jsonv2',
+        q: query,
+        limit: '5',
+        addressdetails: '1',
+        namedetails: '1',
+        'accept-language': 'de'
+      });
+      renderMapSearchResults(results);
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      console.error(error);
+      $('mapSearchStatus').textContent = error.message || 'Die Ortssuche ist momentan nicht erreichbar.';
+    }
+  }
+
+  async function reverseMapPoint(latitude, longitude) {
+    $('mapSearchStatus').textContent = 'Ort wird zur Kartenposition gesucht …';
+    try {
+      const result = await requestNominatim('reverse', {
+        format: 'jsonv2',
+        lat: String(latitude),
+        lon: String(longitude),
+        zoom: '18',
+        namedetails: '1',
+        'accept-language': 'de'
+      });
+      const label = shortPlaceLabel(result);
+      setMapDraftLocation(latitude, longitude, label);
+      $('mapSearchStatus').textContent = `Ausgewählt: ${label}`;
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      console.error(error);
+      setMapDraftLocation(latitude, longitude, 'Ausgewählter Ort');
+      $('mapSearchStatus').textContent = 'Punkt ausgewählt. Ein genauer Ortsname konnte nicht geladen werden.';
+    }
+  }
+
+  function ensureMapPicker() {
+    if (!window.L) {
+      toast('Die Karte konnte nicht geladen werden. Bitte prüfe deine Internetverbindung.');
+      return false;
+    }
+
+    if (!state.mapInstance) {
+      state.mapInstance = window.L.map('mapPickerMap', {
+        zoomControl: true,
+        attributionControl: true
+      });
+      window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende'
+      }).addTo(state.mapInstance);
+
+      state.mapInstance.on('click', event => {
+        const { lat, lng } = event.latlng;
+        setMapDraftLocation(lat, lng, 'Ausgewählter Ort');
+        void reverseMapPoint(lat, lng);
+      });
+    }
+
+    return true;
+  }
+
+  function openMapPicker() {
+    state.mapDraftLocation = normalizeLocation(state.goalDraftLocation);
+    $('mapSearchInput').value = state.mapDraftLocation?.label || '';
+    $('mapSearchStatus').textContent = '';
+    $('mapSearchResults').innerHTML = '';
+    $('mapSearchResults').classList.add('hidden');
+
+    if (state.mapDraftLocation) {
+      $('mapSelectedTitle').textContent = state.mapDraftLocation.label;
+      $('mapSelectedDetail').textContent = `${state.mapDraftLocation.latitude?.toFixed?.(5) ?? ''}, ${state.mapDraftLocation.longitude?.toFixed?.(5) ?? ''}`.replace(/^,\s*$/, 'Ort gespeichert');
+      $('mapPickerApplyBtn').disabled = false;
+    } else {
+      $('mapSelectedTitle').textContent = 'Noch kein Punkt ausgewählt';
+      $('mapSelectedDetail').textContent = 'Suche einen Ort oder tippe auf die Karte.';
+      $('mapPickerApplyBtn').disabled = true;
+    }
+
+    $('mapPickerDialog').showModal();
+
+    requestAnimationFrame(() => {
+      if (!ensureMapPicker()) return;
+      const hasCoordinates = Number.isFinite(state.mapDraftLocation?.latitude) && Number.isFinite(state.mapDraftLocation?.longitude);
+      const center = hasCoordinates
+        ? [state.mapDraftLocation.latitude, state.mapDraftLocation.longitude]
+        : [51.1657, 10.4515];
+      const zoom = hasCoordinates ? 15 : 6;
+      state.mapInstance.setView(center, zoom);
+      if (hasCoordinates) setMapDraftLocation(center[0], center[1], state.mapDraftLocation.label);
+      else if (state.mapMarker) {
+        state.mapMarker.remove();
+        state.mapMarker = null;
+      }
+      state.mapInstance.invalidateSize();
+    });
+  }
+
+  function applyMapPickerSelection() {
+    if (!state.mapDraftLocation) return;
+    state.goalDraftLocation = normalizeLocation(state.mapDraftLocation);
+    renderSelectedPlaceSummary();
+    $('mapPickerDialog').close();
   }
 
   async function saveGoalFromDialog() {
     if (state.editGoalIndex < 0 || !state.currentTrip) return;
 
     const goal = state.currentTrip.goals[state.editGoalIndex];
-    const place = $('placeNameInput').value.trim();
-    const customMapsUrl = $('mapsUrlInput').value.trim();
-
     goal.name = $('goalNameInput').value.trim() || `Ziel ${state.editGoalIndex + 1}`;
     goal.capturedAt = fromLocalDateTimeInput($('goalTimeInput').value) || goal.capturedAt || null;
     goal.info = $('goalInfoInput').value.trim();
-    if (place || customMapsUrl) {
-      const normalizedUrl = normalizeMapsUrl(customMapsUrl, place);
-      const existing = goal.location;
-      const keepGps = existing?.source === 'gps' && existing.mapsUrl === normalizedUrl;
-      goal.location = keepGps
-        ? { ...existing, label: place || existing.label || 'Aufnahmeort', mapsUrl: normalizedUrl }
-        : { source: 'manual', label: place || 'Standort anzeigen', mapsUrl: normalizedUrl, latitude: null, longitude: null, accuracy: null, capturedAt: null };
-    } else {
-      goal.location = null;
-    }
+    goal.location = normalizeLocation(state.goalDraftLocation);
 
     await saveCurrentTrip();
     renderGoals();
@@ -869,7 +874,7 @@
 
       const backup = {
         format: 'travel-tracker-backup',
-        version: 4,
+        version: 5,
         exportedAt: new Date().toISOString(),
         trips
       };
@@ -1142,7 +1147,6 @@
     $('previewTripBtn').addEventListener('click', previewTrip);
     $('shareFileBtn').addEventListener('click', shareTrip);
     $('pdfBtn').addEventListener('click', () => void printTrip());
-    $('locationSettingsBtn').addEventListener('click', () => void openLocationDialog({ onboarding: false }));
 
     $('layoutEditBtn').addEventListener('click', () => {
       state.layoutMode = true;
@@ -1202,10 +1206,27 @@
     });
     $('removePhotoBtn').addEventListener('click', removeCurrentGoalPhoto);
 
-    $('placeNameInput').addEventListener('input', updateMapsControls);
-    $('mapsUrlInput').addEventListener('input', updateMapsControls);
-    $('showMapPreviewBtn').addEventListener('click', showMapPreview);
-    $('removePlaceBtn').addEventListener('click', clearMapFields);
+    $('pickPlaceBtn').addEventListener('click', openMapPicker);
+    $('removePlaceBtn').addEventListener('click', clearMapSelection);
+    $('mapSearchForm').addEventListener('submit', event => {
+      event.preventDefault();
+      void searchMapPlace();
+    });
+    $('mapSearchResults').addEventListener('click', event => {
+      const button = event.target.closest('[data-result-index]');
+      if (!button) return;
+      const result = $('mapSearchResults')._results?.[Number(button.dataset.resultIndex)];
+      if (!result) return;
+      const lat = Number(result.lat);
+      const lng = Number(result.lon);
+      const label = shortPlaceLabel(result);
+      setMapDraftLocation(lat, lng, label);
+      state.mapInstance?.setView([lat, lng], 16);
+      $('mapSearchStatus').textContent = `Ausgewählt: ${label}`;
+    });
+    $('mapPickerApplyBtn').addEventListener('click', applyMapPickerSelection);
+    $('mapPickerCancelBtn').addEventListener('click', () => $('mapPickerDialog').close());
+    $('mapPickerCloseBtn').addEventListener('click', () => $('mapPickerDialog').close());
 
     $('goalForm').addEventListener('submit', async event => {
       if (event.submitter?.value === 'cancel') return;
@@ -1214,11 +1235,10 @@
     });
     $('goalDialog').addEventListener('close', () => {
       state.editGoalIndex = -1;
+      state.goalDraftLocation = null;
+      state.mapDraftLocation = null;
     });
 
-    $('enableLocationBtn').addEventListener('click', enableLocationFromDialog);
-    $('disableLocationBtn').addEventListener('click', disableLocationFromDialog);
-    $('locationCloseBtn').addEventListener('click', () => $('locationDialog').close());
 
     $('confirmActionBtn').addEventListener('click', async event => {
       event.preventDefault();
@@ -1239,7 +1259,7 @@
   async function migrateStoredTrips() {
     const storedTrips = await db.getAllTrips();
     const migrations = storedTrips
-      .filter(trip => trip?.schemaVersion !== 4)
+      .filter(trip => trip?.schemaVersion !== 5)
       .map(normalizeTrip)
       .filter(Boolean);
 
@@ -1251,12 +1271,6 @@
     resetWizard();
     await migrateStoredTrips();
     await refreshHome();
-    await refreshLocationPermissionStatus();
-    if (getLocationPreference() === null) {
-      await openLocationDialog({ onboarding: true });
-    } else {
-      updateLocationTile();
-    }
   }
 
   init().catch(error => {
