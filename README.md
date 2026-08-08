@@ -27,3 +27,12 @@ Der Tracker fragt **keine GPS-Daten** mehr ab. Ein Ort wird manuell eingegeben. 
 - den Ort später im Viewer als anklickbaren Chip anzeigen.
 
 Für einen echten eingebetteten Places-Picker mit Autocomplete und Rückgabe einer eindeutigen Place-ID wäre ein Google-Maps-Platform-API-Key erforderlich.
+
+
+## Standort für Kamera-Fotos
+Travel Tracker kann optional den Geräte-Standort erfassen, wenn ein Foto direkt über „Foto machen“ aufgenommen wird. Die Berechtigung wird nach einer eigenen Erklärung durch die native Browser-Abfrage angefordert. Die Koordinaten werden separat beim Ziel gespeichert und in einen Google-Maps-Link umgewandelt. Für hochgeladene bestehende Fotos wird nicht der aktuelle Standort verwendet.
+
+Die Funktion benötigt HTTPS (GitHub Pages erfüllt das). Sie kann im Hauptmenü jederzeit ein- oder ausgeschaltet werden.
+
+## PDF
+Die PDF-Aktion verwendet kein neues Pop-up-Fenster mehr. Stattdessen wird innerhalb der aktuellen Seite eine druckoptimierte A4-Ansicht erzeugt und der native Druck-/PDF-Dialog des Browsers geöffnet.

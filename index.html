@@ -28,6 +28,7 @@
         <button class="menu-tile" id="libraryBtn" type="button"><span class="tile-icon">▦</span><span><strong>Meine Tracker</strong><small id="libraryCount">Noch keine gespeicherten Tracker</small></span></button>
         <button class="menu-tile" id="exportAllBtn" type="button"><span class="tile-icon">⇩</span><span><strong>Alle exportieren</strong><small>Komplette Bibliothek als Sicherungsdatei</small></span></button>
         <button class="menu-tile" id="importAllBtn" type="button"><span class="tile-icon">⇧</span><span><strong>Sicherung importieren</strong><small>Exportierte Tracker wiederherstellen</small></span></button>
+        <button class="menu-tile" id="locationSettingsBtn" type="button"><span class="tile-icon">⌖</span><span><strong>Standort für Kamera-Fotos</strong><small id="locationTileStatus">Noch nicht eingerichtet</small></span></button>
       </div>
       <section class="recent-section">
         <div class="section-title"><div><span class="eyebrow">SCHNELLZUGRIFF</span><h2>Zuletzt bearbeitet</h2></div><button class="text-btn" id="showAllBtn" type="button">Alle anzeigen →</button></div>
@@ -117,13 +118,14 @@
     <div class="dialog-head"><div><span class="eyebrow">ZIEL BEARBEITEN</span><h2 id="dialogTitle">Ziel 1</h2></div><button class="icon-btn" value="cancel" type="submit">×</button></div>
     <div class="photo-preview" id="dialogPhotoPreview"><span>Noch kein Foto</span></div>
     <div class="photo-action-grid"><button class="primary-btn" id="takePhotoBtn" type="button"><span><strong>Foto machen</strong><small>Kamera öffnen und direkt aufnehmen</small></span></button><button class="ghost-btn" id="choosePhotoBtn" type="button"><span><strong>Foto auswählen</strong><small>Aus Fotos oder Dateien auswählen</small></span></button></div>
+    <div class="capture-location-note" id="captureLocationNote"></div>
     <button class="text-danger-btn" id="removePhotoBtn" type="button">Foto entfernen</button>
     <label class="field-label">Was war das Ziel?<input id="goalNameInput" type="text" maxlength="70" placeholder="z. B. Sydney Opera House"></label>
     <label class="field-label">Zeitpunkt<input id="goalTimeInput" type="datetime-local"></label>
     <label class="field-label">Informationstext (optional)<textarea id="goalInfoInput" maxlength="800" rows="4" placeholder="Was ist hier passiert? Was möchtest du zu diesem Moment festhalten?"></textarea></label>
 
     <section class="maps-box">
-      <div class="maps-head"><div><span class="eyebrow">ORT / GOOGLE MAPS</span><strong>Ort zur Station speichern</strong></div><span class="maps-badge">ohne GPS</span></div>
+      <div class="maps-head"><div><span class="eyebrow">ORT / GOOGLE MAPS</span><strong>Ort zur Station speichern</strong></div><span class="maps-badge" id="mapsModeBadge">manuell</span></div>
       <label class="field-label">Ort oder Sehenswürdigkeit<input id="placeNameInput" type="text" maxlength="120" placeholder="z. B. Sydney Opera House, Sydney"></label>
       <div class="maps-actions"><button class="ghost-btn" id="showMapPreviewBtn" type="button">Kartenvorschau</button><a class="ghost-btn anchor-btn" id="openMapsSearchLink" href="https://www.google.com/maps" target="_blank" rel="noopener">In Google Maps öffnen</a></div>
       <div class="map-preview hidden" id="mapPreviewWrap"><iframe id="mapPreviewFrame" title="Google-Maps-Vorschau" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe><small>Die Vorschau dient zur Orientierung. Für eine eindeutige Auswahl ohne Google-API-Key speichert Travel Tracker den eingegebenen Ortsnamen bzw. einen optionalen Maps-Link.</small></div>
@@ -135,8 +137,20 @@
   </form>
 </dialog>
 
+<dialog id="locationDialog">
+  <div class="dialog-card location-dialog-card">
+    <div class="dialog-head"><div><span class="eyebrow">STANDORT FÜR FOTOS</span><h2>Aufnahmeort automatisch speichern?</h2></div><button class="icon-btn" id="locationCloseBtn" type="button" aria-label="Schließen">×</button></div>
+    <p class="dialog-intro">Wenn du diese Funktion aktivierst, fragt dein Browser nach Standortzugriff. Bei Fotos, die du direkt über <strong>„Foto machen“</strong> aufnimmst, speichert Travel Tracker die Koordinaten separat beim Ziel und erstellt automatisch einen Google-Maps-Link zum Aufnahmeort.</p>
+    <div class="privacy-note"><strong>Die Koordinaten bleiben lokal im Tracker.</strong><span>Sie werden nicht in das Foto hineingeschrieben und nicht automatisch an einen Server übertragen. Beim Teilen einer Reise werden sie nur als Google-Maps-Link Teil der geteilten Reise.</span></div>
+    <div class="permission-panel" id="locationPermissionPanel"><strong id="locationPermissionHeadline">Status wird geprüft …</strong><span id="locationPermissionText"></span></div>
+    <div class="location-help hidden" id="locationHelp"></div>
+    <div class="dialog-actions location-actions"><button class="ghost-btn" id="disableLocationBtn" type="button">Nicht verwenden</button><button class="primary-btn" id="enableLocationBtn" type="button">Standort aktivieren</button></div>
+  </div>
+</dialog>
+
 <dialog id="confirmDialog"><form method="dialog" class="dialog-card confirm-card"><h2 id="confirmTitle">Tracker löschen?</h2><p id="confirmText">Diese Aktion kann nicht rückgängig gemacht werden.</p><div class="dialog-actions"><button class="ghost-btn" value="cancel">Abbrechen</button><button class="danger-btn" id="confirmActionBtn" value="default">Löschen</button></div></form></dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="core.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
