@@ -1,42 +1,49 @@
 <!doctype html>
 <html lang="de">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#101827" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101827">
   <title>Travel Tracker</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="app-shell">
-  <header class="topbar no-export">
+  <header class="topbar">
     <button class="brand" id="brandHome" type="button" aria-label="Zum Hauptmenü">
-      <span class="brand-mark">TT</span><span><strong>Travel Tracker</strong><small>Erlebnisse planen & festhalten</small></span>
+      <span class="brand-mark">TT</span>
+      <span><strong>Travel Tracker</strong><small>Erlebnisse planen & festhalten</small></span>
     </button>
-    <button class="ghost-btn hidden" id="topHomeBtn" type="button">Hauptmenü</button>
   </header>
 
   <main>
     <section class="screen active" id="screenHome">
-      <div class="hero home-hero"><span class="eyebrow">TRAVEL TRACKER</span><h1>Deine Erlebnisse an einem Ort.</h1><p>Plane Reisen, Wanderungen oder Geburtstage, gestalte dein Erinnerungsblatt frei und sichere alles lokal auf deinem Gerät.</p></div>
+      <div class="hero home-hero">
+        <span class="eyebrow">TRAVEL TRACKER</span>
+        <h1>Deine Erlebnisse an einem Ort.</h1>
+        <p>Plane Reisen, Wanderungen oder Geburtstage, halte Stationen mit Fotos fest und sichere alles lokal auf deinem Gerät.</p>
+      </div>
       <div class="dashboard-grid">
         <button class="menu-tile primary-tile" id="newTripBtn" type="button"><span class="tile-icon">＋</span><span><strong>Neuen Tracker erstellen</strong><small>Reise, Wanderung oder Geburtstag planen</small></span></button>
         <button class="menu-tile" id="libraryBtn" type="button"><span class="tile-icon">▦</span><span><strong>Meine Tracker</strong><small id="libraryCount">Noch keine gespeicherten Tracker</small></span></button>
         <button class="menu-tile" id="exportAllBtn" type="button"><span class="tile-icon">⇩</span><span><strong>Alle exportieren</strong><small>Komplette Bibliothek als Sicherungsdatei</small></span></button>
         <button class="menu-tile" id="importAllBtn" type="button"><span class="tile-icon">⇧</span><span><strong>Sicherung importieren</strong><small>Exportierte Tracker wiederherstellen</small></span></button>
       </div>
-      <section class="recent-section"><div class="section-title"><div><span class="eyebrow">SCHNELLZUGRIFF</span><h2>Zuletzt bearbeitet</h2></div><button class="text-btn" id="showAllBtn" type="button">Alle anzeigen →</button></div><div id="recentTrips" class="recent-grid"><div class="empty-card">Noch keine Tracker vorhanden.</div></div></section>
+      <section class="recent-section">
+        <div class="section-title"><div><span class="eyebrow">SCHNELLZUGRIFF</span><h2>Zuletzt bearbeitet</h2></div><button class="text-btn" id="showAllBtn" type="button">Alle anzeigen →</button></div>
+        <div id="recentTrips" class="recent-grid"><div class="empty-card">Noch keine Tracker vorhanden.</div></div>
+      </section>
     </section>
 
     <section class="screen" id="screenLibrary">
-      <div class="step-header no-export"><button class="back-btn" data-nav="home" type="button">← Hauptmenü</button></div>
+      <div class="step-header"><button class="back-btn" data-nav="home" type="button">← Hauptmenü</button></div>
       <div class="hero compact"><span class="eyebrow">BIBLIOTHEK</span><h1>Meine Tracker</h1><p>Alle lokal auf diesem Gerät gespeicherten Erlebnisse.</p></div>
-      <div class="library-toolbar no-export"><button class="primary-btn" id="libraryNewBtn" type="button">＋ Neuer Tracker</button><button class="ghost-btn" id="libraryExportBtn" type="button">Alle exportieren</button><button class="ghost-btn" id="libraryImportBtn" type="button">Importieren</button></div>
+      <div class="library-toolbar"><button class="primary-btn" id="libraryNewBtn" type="button">＋ Neuer Tracker</button><button class="ghost-btn" id="libraryExportBtn" type="button">Alle exportieren</button><button class="ghost-btn" id="libraryImportBtn" type="button">Importieren</button></div>
       <div class="trip-library" id="tripLibrary"></div>
     </section>
 
     <section class="screen" id="screenCategories">
-      <div class="step-header no-export"><button class="back-btn" data-nav="home" type="button">← Abbrechen</button><span class="eyebrow">1 / 4</span></div>
+      <div class="step-header"><button class="back-btn" data-nav="home" type="button">← Abbrechen</button><span class="eyebrow">1 / 4</span></div>
       <div class="hero compact"><h1>Was möchtest du festhalten?</h1><p>Wähle die passende Kategorie.</p></div>
       <div class="category-grid">
         <button class="category-card" data-category="travel" type="button"><span class="category-icon">✈</span><span class="category-copy"><strong>Reise</strong><small>Städte, Stopps und besondere Momente</small></span><span class="arrow">→</span></button>
@@ -46,16 +53,16 @@
     </section>
 
     <section class="screen" id="screenBackgrounds">
-      <div class="step-header no-export"><button class="back-btn" data-nav="categories" type="button">← Zurück</button><span class="eyebrow">2 / 4</span></div>
-      <div class="hero compact"><h1>Wähle einen Hintergrund</h1><p>Das Motiv bildet später die komplette Erinnerungsseite.</p></div>
+      <div class="step-header"><button class="back-btn" data-nav="categories" type="button">← Zurück</button><span class="eyebrow">2 / 4</span></div>
+      <div class="hero compact"><h1>Wähle einen Hintergrund</h1><p>Das Motiv wird später auch in der Reiseansicht verwendet.</p></div>
       <div class="background-grid" id="backgroundGrid"></div>
     </section>
 
     <section class="screen" id="screenSetup">
-      <div class="step-header no-export"><button class="back-btn" data-nav="backgrounds" type="button">← Zurück</button><span class="eyebrow">3 / 4</span></div>
+      <div class="step-header"><button class="back-btn" data-nav="backgrounds" type="button">← Zurück</button><span class="eyebrow">3 / 4</span></div>
       <div class="hero compact"><h1>Tracker einrichten</h1><p>Gib deinem Erlebnis einen Namen, trage die Mitreisenden ein und bestimme 1 bis 10 Ziele.</p></div>
       <div class="setup-card">
-        <label class="field-label">Titel<input id="projectTitle" type="text" maxlength="60" placeholder="z. B. Australien" /></label>
+        <label class="field-label">Titel<input id="projectTitle" type="text" maxlength="60" placeholder="z. B. Australien"></label>
         <div class="field-label">Wie viele Personen sind dabei?<div class="counter"><button id="decreasePeople" type="button">−</button><output id="peopleCount">1</output><button id="increasePeople" type="button">＋</button></div></div>
         <div class="participant-fields" id="participantFields"></div>
         <div class="field-label">Anzahl der Ziele<div class="counter"><button id="decreaseGoals" type="button">−</button><output id="goalCount">6</output><button id="increaseGoals" type="button">＋</button></div></div>
@@ -64,19 +71,19 @@
     </section>
 
     <section class="screen" id="screenLayouts">
-      <div class="step-header no-export"><button class="back-btn" data-nav="setup" type="button">← Zurück</button><span class="eyebrow">4 / 4</span></div>
+      <div class="step-header"><button class="back-btn" data-nav="setup" type="button">← Zurück</button><span class="eyebrow">4 / 4</span></div>
       <div class="hero compact"><h1>Wähle ein Startlayout</h1><p>Du kannst danach jede Kachel frei verschieben und drehen.</p></div>
       <div class="layout-grid" id="layoutGrid"></div>
     </section>
 
     <section class="screen tracker-screen" id="screenTracker">
-      <div class="tracker-toolbar no-export">
+      <div class="tracker-toolbar">
         <div><span class="eyebrow" id="trackerCategoryLabel">REISE</span><h1 id="trackerTitle">Unser Abenteuer</h1><p id="saveState">Lokal gespeichert</p></div>
         <div class="toolbar-actions"><button class="ghost-btn" id="layoutEditBtn" type="button">Layout bearbeiten</button><button class="ghost-btn" id="saveBtn" type="button">Speichern</button><button class="ghost-btn" id="trackerHomeBtn" type="button">Hauptmenü</button><button class="primary-btn" id="finishBtn" type="button">Tracker abschließen</button></div>
       </div>
-      <div class="progress-wrap no-export"><div class="progress-label"><span>Fortschritt</span><strong id="progressText">0 / 6</strong></div><div class="progress-track"><div id="progressBar" class="progress-bar"></div></div></div>
+      <div class="progress-wrap"><div class="progress-label"><span>Fortschritt</span><strong id="progressText">0 / 6</strong></div><div class="progress-track"><div id="progressBar" class="progress-bar"></div></div></div>
 
-      <div class="layout-editor no-export hidden" id="layoutEditor">
+      <div class="layout-editor hidden" id="layoutEditor">
         <div class="editor-head"><div><strong>Layout-Editor</strong><span>Kachel antippen und ziehen. Einstellungen gelten für die ausgewählte Kachel.</span></div><button class="primary-btn" id="doneLayoutBtn" type="button">Fertig</button></div>
         <div class="editor-controls">
           <div class="control-group"><span>Ausgewähltes Ziel</span><strong id="selectedGoalLabel">Keines</strong></div>
@@ -88,12 +95,12 @@
         </div>
       </div>
 
-      <div class="complete-actions no-export hidden" id="completeActions"><div><strong>Tracker abgeschlossen</strong><span>Jetzt kannst du die Reise direkt ansehen, als randlose PDF-Datei erzeugen oder die Ansicht teilen.</span></div><button class="ghost-btn" id="previewTripBtn" type="button">Reise ansehen</button><button class="ghost-btn" id="pdfBtn" type="button">PDF herunterladen</button><button class="ghost-btn" id="shareFileBtn" type="button">Ansicht teilen</button></div>
+      <div class="complete-actions hidden" id="completeActions"><div><strong>Tracker abgeschlossen</strong><span>Öffne die Reise direkt im Viewer, erstelle eine PDF oder teile eine Präsentationsdatei.</span></div><button class="ghost-btn" id="previewTripBtn" type="button">Reise ansehen</button><button class="ghost-btn" id="pdfBtn" type="button">PDF herunterladen</button><button class="ghost-btn" id="shareFileBtn" type="button">Ansicht teilen</button></div>
 
       <article class="tracker-board" id="trackerBoard">
         <div class="board-overlay"></div>
         <svg class="journey-path" id="journeyPath" viewBox="0 0 1000 1414" preserveAspectRatio="none" aria-hidden="true"></svg>
-        <div class="board-heading"><span id="boardBadge">REISE</span><h2 id="boardTitle">Unser Abenteuer</h2><p>Tippe auf ein Ziel, um Namen und Foto hinzuzufügen.</p></div>
+        <div class="board-heading"><span id="boardBadge">REISE</span><h2 id="boardTitle">Unser Abenteuer</h2><p>Tippe auf ein Ziel, um Namen, Foto und Informationen hinzuzufügen.</p></div>
         <div class="goals-canvas" id="goalsCanvas"></div>
         <footer class="board-footer">Travel Tracker · Erinnerungen, die bleiben</footer>
       </article>
@@ -101,11 +108,33 @@
   </main>
 </div>
 
-<input class="visually-hidden" id="cameraPicker" type="file" accept="image/*" capture="environment" />
-<input class="visually-hidden" id="photoPicker" type="file" accept="image/*" />
-<input class="visually-hidden" id="importPicker" type="file" accept=".traveltracker,.json,application/json" />
+<input class="visually-hidden" id="cameraPicker" type="file" accept="image/*" capture="environment">
+<input class="visually-hidden" id="photoPicker" type="file" accept="image/*">
+<input class="visually-hidden" id="importPicker" type="file" accept=".traveltracker,.json,application/json">
 
-<dialog id="goalDialog"><form method="dialog" class="dialog-card" id="goalForm"><div class="dialog-head"><div><span class="eyebrow">ZIEL BEARBEITEN</span><h2 id="dialogTitle">Ziel 1</h2></div><button class="icon-btn" value="cancel" type="submit">×</button></div><div class="photo-preview" id="dialogPhotoPreview"><span>Noch kein Foto</span></div><div class="photo-action-grid"><button class="primary-btn" id="takePhotoBtn" type="button"><span class="photo-action-icon">●</span><span><strong>Foto machen</strong><small>Kamera öffnen und direkt aufnehmen</small></span></button><button class="ghost-btn" id="choosePhotoBtn" type="button"><span class="photo-action-icon">▧</span><span><strong>Foto auswählen</strong><small>Aus Fotos oder Dateien auswählen</small></span></button></div><button class="text-danger-btn" id="removePhotoBtn" type="button">Foto entfernen</button><label class="field-label">Was war das Ziel?<input id="goalNameInput" type="text" maxlength="70" placeholder="z. B. Brandenburger Tor" /></label><label class="field-label">Zeitpunkt<input id="goalTimeInput" type="datetime-local" /></label><label class="field-label">Informationstext (optional)<textarea id="goalInfoInput" maxlength="600" rows="4" placeholder="Was ist hier passiert? Was möchtest du zu diesem Moment festhalten?"></textarea></label><div class="maps-location-box"><div class="maps-location-head"><div><strong>Ort / Sehenswürdigkeit (optional)</strong><small>Keine GPS-Abfrage. Suche den Ort manuell über Google Maps.</small></div></div><label class="field-label">Ort oder Adresse<input id="goalPlaceInput" type="text" maxlength="140" placeholder="z. B. Sydney Opera House, Sydney" /></label><label class="field-label">Google-Maps-Link (optional)<input id="goalMapsUrlInput" type="url" maxlength="1200" placeholder="Kann für einen ganz bestimmten Pin eingefügt werden" /></label><div class="maps-actions"><button class="ghost-btn" id="searchMapsBtn" type="button">In Google Maps suchen</button><button class="text-danger-btn" id="removePlaceBtn" type="button">Ort entfernen</button></div><small class="maps-hint">Wenn kein eigener Link eingefügt wird, erzeugt Travel Tracker automatisch einen Google-Maps-Suchlink aus dem Ortsnamen.</small></div><button class="save-btn" id="saveGoalBtn" value="default" type="submit">Übernehmen</button></form></dialog>
+<dialog id="goalDialog">
+  <form method="dialog" class="dialog-card" id="goalForm">
+    <div class="dialog-head"><div><span class="eyebrow">ZIEL BEARBEITEN</span><h2 id="dialogTitle">Ziel 1</h2></div><button class="icon-btn" value="cancel" type="submit">×</button></div>
+    <div class="photo-preview" id="dialogPhotoPreview"><span>Noch kein Foto</span></div>
+    <div class="photo-action-grid"><button class="primary-btn" id="takePhotoBtn" type="button"><span><strong>Foto machen</strong><small>Kamera öffnen und direkt aufnehmen</small></span></button><button class="ghost-btn" id="choosePhotoBtn" type="button"><span><strong>Foto auswählen</strong><small>Aus Fotos oder Dateien auswählen</small></span></button></div>
+    <button class="text-danger-btn" id="removePhotoBtn" type="button">Foto entfernen</button>
+    <label class="field-label">Was war das Ziel?<input id="goalNameInput" type="text" maxlength="70" placeholder="z. B. Sydney Opera House"></label>
+    <label class="field-label">Zeitpunkt<input id="goalTimeInput" type="datetime-local"></label>
+    <label class="field-label">Informationstext (optional)<textarea id="goalInfoInput" maxlength="800" rows="4" placeholder="Was ist hier passiert? Was möchtest du zu diesem Moment festhalten?"></textarea></label>
+
+    <section class="maps-box">
+      <div class="maps-head"><div><span class="eyebrow">ORT / GOOGLE MAPS</span><strong>Ort zur Station speichern</strong></div><span class="maps-badge">ohne GPS</span></div>
+      <label class="field-label">Ort oder Sehenswürdigkeit<input id="placeNameInput" type="text" maxlength="120" placeholder="z. B. Sydney Opera House, Sydney"></label>
+      <div class="maps-actions"><button class="ghost-btn" id="showMapPreviewBtn" type="button">Kartenvorschau</button><a class="ghost-btn anchor-btn" id="openMapsSearchLink" href="https://www.google.com/maps" target="_blank" rel="noopener">In Google Maps öffnen</a></div>
+      <div class="map-preview hidden" id="mapPreviewWrap"><iframe id="mapPreviewFrame" title="Google-Maps-Vorschau" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe><small>Die Vorschau dient zur Orientierung. Für eine eindeutige Auswahl ohne Google-API-Key speichert Travel Tracker den eingegebenen Ortsnamen bzw. einen optionalen Maps-Link.</small></div>
+      <label class="field-label">Google-Maps-Link (optional)<input id="mapsUrlInput" type="url" placeholder="https://maps.google.com/... oder https://www.google.com/maps/..."></label>
+      <button class="text-danger-btn hidden" id="removePlaceBtn" type="button">Ort entfernen</button>
+    </section>
+
+    <button class="save-btn" id="saveGoalBtn" value="default" type="submit">Übernehmen</button>
+  </form>
+</dialog>
+
 <dialog id="confirmDialog"><form method="dialog" class="dialog-card confirm-card"><h2 id="confirmTitle">Tracker löschen?</h2><p id="confirmText">Diese Aktion kann nicht rückgängig gemacht werden.</p><div class="dialog-actions"><button class="ghost-btn" value="cancel">Abbrechen</button><button class="danger-btn" id="confirmActionBtn" value="default">Löschen</button></div></form></dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="app.js"></script>

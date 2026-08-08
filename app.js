@@ -1,141 +1,575 @@
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const screens={home:$('#screenHome'),library:$('#screenLibrary'),categories:$('#screenCategories'),backgrounds:$('#screenBackgrounds'),setup:$('#screenSetup'),layouts:$('#screenLayouts'),tracker:$('#screenTracker')};
-const categoryMeta={travel:{label:'REISE',name:'Reise'},hiking:{label:'WANDERN',name:'Wanderung'},birthday:{label:'GEBURTSTAG',name:'Geburtstag'}};
-const backgrounds={
- travel:[{id:'travel-coast',name:'Küste',css:'linear-gradient(145deg,#527d99 0%,#92c3d4 38%,#d8b777 39%,#36584a 100%)'},{id:'travel-city',name:'City',css:'linear-gradient(140deg,#162033,#4c6681 43%,#d3a66d 44%,#684f4d 100%)'},{id:'travel-sunset',name:'Sonnenuntergang',css:'linear-gradient(145deg,#43386f,#dd7f77 46%,#f1c684 65%,#426b77)'}],
- hiking:[{id:'hiking-forest',name:'Wald',css:'linear-gradient(145deg,#183b2b,#52744c 48%,#b0a66b 49%,#314b35)'},{id:'hiking-mountain',name:'Berge',css:'linear-gradient(160deg,#72879a,#d6e0e4 43%,#6b7d66 44%,#334a37)'},{id:'hiking-autumn',name:'Herbst',css:'linear-gradient(145deg,#5b3526,#a86638 45%,#c6a45b 46%,#43523b)'}],
- birthday:[{id:'birthday-balloons',name:'Ballon-Party',css:"url('assets/birthday-prototype.png') center/cover"},{id:'birthday-confetti',name:'Konfetti',css:'linear-gradient(135deg,#7543a3,#e878aa 42%,#f5ce6a 43%,#53a9aa)'},{id:'birthday-night',name:'Party-Nacht',css:'linear-gradient(135deg,#17152f,#463a83 42%,#b34970 70%,#e7a451)'}]
-};
-const layoutPresets={
- zigzag:{name:'Zickzack',desc:'Abwechselnd links und rechts',positions:[[6,22,-3],[59,25,3],[8,41,-2],[58,45,2],[7,61,-3],[59,65,3],[8,80,-2],[58,82,2],[34,72,-1],[35,88,1]]},
- flowing:{name:'Fließend',desc:'Locker entlang einer geschwungenen Route',positions:[[8,22,-4],[53,31,4],[12,43,2],[57,48,-3],[8,59,-2],[53,66,3],[14,76,-4],[57,80,2],[31,68,1],[34,86,-2]]},
- collage:{name:'Collage',desc:'Dichter und verspielter angeordnet',positions:[[5,22,-5],[38,24,3],[65,29,-2],[10,42,2],[54,45,5],[24,56,-4],[63,61,2],[7,70,-2],[39,75,4],[61,83,-3]]}
-};
-let draft={category:null,background:null,goalCount:6,title:'',layoutPreset:'zigzag',peopleCount:1,participants:['']},activeTrip=null,editingGoal=null,pendingPhoto=null,confirmCallback=null,layoutMode=false,selectedGoal=null,dragState=null;
-const DB_NAME='travel-tracker-db',STORE='trips';
-function openDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(STORE))r.result.createObjectStore(STORE,{keyPath:'id'})};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
-async function dbPut(t){const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(t);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)})}
-async function dbGet(id){const db=await openDB();return new Promise((res,rej)=>{const r=db.transaction(STORE).objectStore(STORE).get(id);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
-async function dbAll(){const db=await openDB();return new Promise((res,rej)=>{const r=db.transaction(STORE).objectStore(STORE).getAll();r.onsuccess=()=>res(r.result.sort((a,b)=>b.updatedAt-a.updatedAt));r.onerror=()=>rej(r.error)})}
-async function dbDelete(id){const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(id);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)})}
-function showScreen(name){Object.values(screens).forEach(s=>s.classList.remove('active'));screens[name].classList.add('active');$('#topHomeBtn').classList.toggle('hidden',name==='home');window.scrollTo({top:0,behavior:'smooth'});if(name==='home')refreshHome();if(name==='library')renderLibrary()}
-function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),2600)}
-function safeText(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
-function formatDate(ts){return new Intl.DateTimeFormat('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(ts))}
-function bgCss(t){return backgrounds[t.category]?.find(b=>b.id===t.background)?.css||'#64748b'}
-function slug(s){return(s||'tracker').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
-function downloadBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1200)}
-function makeLayout(goalCount,preset='zigzag'){const p=layoutPresets[preset]||layoutPresets.zigzag;return Array.from({length:goalCount},(_,i)=>{const v=p.positions[i]||[10+(i%2)*50,22+i*7,0];return{x:v[0],y:v[1],rotation:v[2],entry:'auto',exit:'auto'}})}
-function ensureTripLayout(t){t.layoutPreset=t.layoutPreset||'zigzag';t.lineStyle=t.lineStyle||'dashed';t.participants=Array.isArray(t.participants)&&t.participants.length?t.participants:[''];const fallback=makeLayout(t.goals.length,t.layoutPreset);t.goals.forEach((g,i)=>{g.layout={...fallback[i],...(g.layout||{})};g.info=g.info||'';g.capturedAt=g.capturedAt||null;g.place=g.place&&typeof g.place==='object'?g.place:null;delete g.location});return t}
-function renderParticipantFields(){const box=$('#participantFields');if(!box)return;const old=$$('.participant-name').map(x=>x.value);box.innerHTML='';for(let i=0;i<draft.peopleCount;i++){const l=document.createElement('label');l.className='field-label';l.innerHTML=`Name ${i+1}<input class="participant-name" type="text" maxlength="40" placeholder="Name der Person ${i+1}">`;l.querySelector('input').value=old[i]||draft.participants[i]||'';box.appendChild(l)}}
-function toLocalDateTimeValue(ts){if(!ts)return'';const d=new Date(ts),z=n=>String(n).padStart(2,'0');return`${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`}
-function fromLocalDateTimeValue(v){if(!v)return null;const d=new Date(v);return Number.isNaN(d.getTime())?null:d.getTime()}
-function formatTime(ts){return new Intl.DateTimeFormat('de-DE',{hour:'2-digit',minute:'2-digit'}).format(new Date(ts))}
-function formatFullTime(ts){return new Intl.DateTimeFormat('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(ts))}
-function mapsSearchUrl(query){const q=(query||'').trim();return q?`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`:''}
-function normalizedMapsUrl(url,query){const u=(url||'').trim();if(u&&/^https?:\/\//i.test(u))return u;return mapsSearchUrl(query)}
-function renderPlaceFields(){if(editingGoal===null)return;const g=activeTrip.goals[editingGoal];$('#goalPlaceInput').value=g.place?.name||'';$('#goalMapsUrlInput').value=g.place?.url||'';$('#removePlaceBtn').disabled=!g.place}
-async function refreshHome(){const trips=await dbAll();$('#libraryCount').textContent=trips.length?`${trips.length} Tracker gespeichert`:'Noch keine gespeicherten Tracker';const box=$('#recentTrips');box.innerHTML='';if(!trips.length){box.innerHTML='<div class="empty-card">Noch keine Tracker vorhanden. Erstelle deinen ersten Tracker.</div>';return}trips.slice(0,3).forEach(t=>box.appendChild(makeTripCard(t,false)))}
-function makeTripCard(t,full=true){const w=document.createElement('article');w.className='trip-card';const done=t.goals.filter(g=>g.photo).length;w.innerHTML=`<button class="trip-delete-x" type="button" aria-label="${safeText(t.title)} löschen">×</button><div class="trip-cover" style="background:${bgCss(t)}"><span>${categoryMeta[t.category]?.label||'TRACKER'}</span></div><div class="trip-body"><h3>${safeText(t.title)}</h3><div class="trip-meta">${done}/${t.goals.length} Ziele · ${t.completed?'Abgeschlossen':'In Bearbeitung'} · ${formatDate(t.updatedAt)}</div><div class="trip-actions"><button class="primary-btn open-trip" type="button">Öffnen</button></div></div>`;w.querySelector('.open-trip').onclick=()=>openTrip(t.id);w.querySelector('.trip-delete-x').onclick=e=>{e.stopPropagation();askDelete(t)};return w}
-async function renderLibrary(){const trips=await dbAll(),box=$('#tripLibrary');box.innerHTML='';if(!trips.length){box.innerHTML='<div class="empty-card">Deine Bibliothek ist noch leer.</div>';return}trips.forEach(t=>box.appendChild(makeTripCard(t,true)))}
-function resetDraft(){draft={category:null,background:null,goalCount:6,title:'',layoutPreset:'zigzag',peopleCount:1,participants:['']};$('#goalCount').textContent='6';$('#peopleCount').textContent='1';$('#projectTitle').value='';renderParticipantFields()}
-function chooseCategory(cat){draft.category=cat;renderBackgrounds();showScreen('backgrounds')}
-function renderBackgrounds(){const grid=$('#backgroundGrid');grid.innerHTML='';backgrounds[draft.category].forEach(bg=>{const b=document.createElement('button');b.type='button';b.className='background-option';b.style.background=bg.css;b.innerHTML=`<span>${bg.name}</span>`;b.onclick=()=>{draft.background=bg.id;showScreen('setup')};grid.appendChild(b)})}
-function renderLayoutChoices(){draft.title=$('#projectTitle').value.trim()||`Meine ${categoryMeta[draft.category].name}`;draft.participants=$$('.participant-name').map(x=>x.value.trim()).filter(Boolean);if(!draft.participants.length)draft.participants=['Unbekannt'];draft.peopleCount=draft.participants.length;const grid=$('#layoutGrid');grid.innerHTML='';Object.entries(layoutPresets).forEach(([id,p])=>{const b=document.createElement('button');b.type='button';b.className='layout-option';const minis=makeLayout(Math.min(draft.goalCount,6),id).map(l=>`<i class="mini-card" style="left:${l.x}%;top:${l.y}%;transform:rotate(${l.rotation}deg)"></i>`).join('');b.innerHTML=`<div class="layout-preview" style="background:${backgrounds[draft.category].find(x=>x.id===draft.background).css}">${minis}</div><strong>${p.name}</strong><small>${p.desc}</small>`;b.onclick=()=>{draft.layoutPreset=id;createTrip()};grid.appendChild(b)})}
-async function createTrip(){const now=Date.now(),layouts=makeLayout(draft.goalCount,draft.layoutPreset);activeTrip={id:crypto.randomUUID(),title:draft.title,participants:draft.participants,category:draft.category,background:draft.background,layoutPreset:draft.layoutPreset,lineStyle:'dashed',createdAt:now,updatedAt:now,completed:false,goals:Array.from({length:draft.goalCount},(_,i)=>({id:crypto.randomUUID(),name:`Ziel ${i+1}`,photo:null,capturedAt:null,info:'',place:null,layout:layouts[i]}))};await dbPut(activeTrip);layoutMode=false;selectedGoal=null;renderTracker();showScreen('tracker');toast('Tracker lokal gespeichert.')}
-async function openTrip(id){activeTrip=ensureTripLayout(await dbGet(id));if(!activeTrip)return;layoutMode=false;selectedGoal=null;renderTracker();showScreen('tracker')}
-function cardBounds(g){return{x:g.layout.x,y:g.layout.y,w:31,h:18}}
-function sidePoint(g,side,target){const b=cardBounds(g),cx=b.x+b.w/2,cy=b.y+b.h/2;if(side==='auto'){const dx=target.x-cx,dy=target.y-cy;side=Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'bottom':'top')}return side==='left'?{x:b.x,y:cy}:side==='right'?{x:b.x+b.w,y:cy}:side==='top'?{x:cx,y:b.y}:{x:cx,y:b.y+b.h}}
-function connectorPath(a,b){const ca={x:a.layout.x+15.5,y:a.layout.y+9},cb={x:b.layout.x+15.5,y:b.layout.y+9};const p1=sidePoint(a,a.layout.exit||'auto',cb),p2=sidePoint(b,b.layout.entry||'auto',ca);const x1=p1.x*10,y1=p1.y*14.14,x2=p2.x*10,y2=p2.y*14.14;const dx=x2-x1,dy=y2-y1;let c1x=x1,c1y=y1,c2x=x2,c2y=y2;if(Math.abs(dx)>=Math.abs(dy)){c1x=x1+dx*.45;c2x=x2-dx*.45}else{c1y=y1+dy*.45;c2y=y2-dy*.45}return`M ${x1.toFixed(1)} ${y1.toFixed(1)} C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${x2.toFixed(1)} ${y2.toFixed(1)}`}
-function renderConnectors(){const svg=$('#journeyPath');svg.innerHTML='';if(!activeTrip||activeTrip.lineStyle==='none')return;for(let i=0;i<activeTrip.goals.length-1;i++){const a=activeTrip.goals[i],b=activeTrip.goals[i+1],p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',connectorPath(a,b));if(activeTrip.lineStyle==='dashed')p.setAttribute('stroke-dasharray','14 14');svg.appendChild(p)}}
-function renderTracker(){if(!activeTrip)return;ensureTripLayout(activeTrip);const meta=categoryMeta[activeTrip.category];$('#trackerCategoryLabel').textContent=meta.label;$('#trackerTitle').textContent=activeTrip.title;$('#boardBadge').textContent=meta.label;$('#boardTitle').textContent=activeTrip.title;$('#trackerBoard').style.background=bgCss(activeTrip);$('#trackerBoard').classList.toggle('layout-editing',layoutMode);$('#layoutEditor').classList.toggle('hidden',!layoutMode);$('#layoutEditBtn').textContent=layoutMode?'Layout wird bearbeitet':'Layout bearbeiten';const box=$('#goalsCanvas');box.innerHTML='';activeTrip.goals.forEach((g,i)=>{const slot=document.createElement('div');slot.className='goal-slot'+(selectedGoal===i?' selected':'');slot.dataset.index=i;slot.style.left=`${g.layout.x}%`;slot.style.top=`${g.layout.y}%`;const c=document.createElement('button');c.type='button';c.className='goal-card'+(g.photo?' done':'');c.style.transform=`rotate(${g.layout.rotation||0}deg)`;const tm=g.capturedAt?formatTime(g.capturedAt):'';c.innerHTML=`<span class="goal-index">${i+1}</span><div class="goal-photo">${g.photo?'':'<span><span class="plus">＋</span>Foto hinzufügen</span>'}${g.place?.name?`<span class="goal-place-badge">⌖ ${safeText(g.place.name)}</span>`:''}</div><div class="goal-label"><strong>${safeText(g.name||`Ziel ${i+1}`)}</strong>${tm?`<small class="goal-time">${tm}</small>`:`<small>${g.photo?'Erinnerung gespeichert':'Noch offen'}</small>`}</div>`;if(g.photo)c.querySelector('.goal-photo').style.backgroundImage=`url(${g.photo})`;slot.appendChild(c);if(layoutMode){slot.addEventListener('pointerdown',startDrag);slot.onclick=e=>{e.preventDefault();selectLayoutGoal(i)}}else c.onclick=()=>editGoal(i);box.appendChild(slot)});renderConnectors();updateProgress();$('#completeActions').classList.toggle('hidden',!activeTrip.completed);$('#finishBtn').textContent=activeTrip.completed?'Tracker wieder öffnen':'Tracker abschließen';$('#saveState').textContent=`Lokal gespeichert · ${formatDate(activeTrip.updatedAt)}`;updateEditorControls()}
-function updateProgress(){const done=activeTrip.goals.filter(g=>g.photo).length,total=activeTrip.goals.length;$('#progressText').textContent=`${done} / ${total}`;$('#progressBar').style.width=`${(done/total)*100}%`}
-async function saveTrip(showToast=true){if(!activeTrip)return;activeTrip.updatedAt=Date.now();await dbPut(activeTrip);$('#saveState').textContent=`Lokal gespeichert · ${formatDate(activeTrip.updatedAt)}`;if(showToast)toast('Änderungen gespeichert.')}
-function selectLayoutGoal(i){selectedGoal=i;renderTracker()}
-function updateEditorControls(){const has=selectedGoal!==null&&activeTrip?.goals[selectedGoal];$('#selectedGoalLabel').textContent=has?`Ziel ${selectedGoal+1}`:'Keines';['rotateLeftBtn','rotationResetBtn','rotateRightBtn','entrySideSelect','exitSideSelect'].forEach(id=>$('#'+id).disabled=!has);if(has){const l=activeTrip.goals[selectedGoal].layout;$('#entrySideSelect').value=l.entry||'auto';$('#exitSideSelect').value=l.exit||'auto';$('#rotationResetBtn').textContent=`${Math.round(l.rotation||0)}°`}$('#lineStyleSelect').value=activeTrip?.lineStyle||'dashed'}
-function startDrag(e){if(!layoutMode)return;const card=e.currentTarget,i=+card.dataset.index;selectedGoal=i;$$('.goal-slot').forEach(x=>x.classList.toggle('selected',+x.dataset.index===i));updateEditorControls();const rect=$('#trackerBoard').getBoundingClientRect(),g=activeTrip.goals[i];dragState={i,startX:e.clientX,startY:e.clientY,origX:g.layout.x,origY:g.layout.y,rect,moved:false};card.setPointerCapture(e.pointerId);card.addEventListener('pointermove',dragMove);card.addEventListener('pointerup',dragEnd,{once:true});card.addEventListener('pointercancel',dragEnd,{once:true})}
-function dragMove(e){if(!dragState)return;const d=dragState,g=activeTrip.goals[d.i],dx=(e.clientX-d.startX)/d.rect.width*100,dy=(e.clientY-d.startY)/d.rect.height*100;if(Math.abs(dx)+Math.abs(dy)>.3)d.moved=true;g.layout.x=Math.max(0,Math.min(69,d.origX+dx));g.layout.y=Math.max(15,Math.min(80.5,d.origY+dy));const card=$(`.goal-slot[data-index="${d.i}"]`);card.style.left=`${g.layout.x}%`;card.style.top=`${g.layout.y}%`;renderConnectors()}
-async function dragEnd(e){const card=e.currentTarget;card.removeEventListener('pointermove',dragMove);dragState=null;await saveTrip(false)}
-function rotateSelected(delta){if(selectedGoal===null)return;const l=activeTrip.goals[selectedGoal].layout;l.rotation=delta===0?0:Math.max(-30,Math.min(30,(l.rotation||0)+delta));renderTracker();saveTrip(false)}
-function resetLayout(){if(!activeTrip)return;const positions=makeLayout(activeTrip.goals.length,activeTrip.layoutPreset||'zigzag');activeTrip.goals.forEach((g,i)=>g.layout={...positions[i],entry:'auto',exit:'auto'});selectedGoal=null;renderTracker();saveTrip(false);toast('Startlayout wiederhergestellt.')}
-function editGoal(index){editingGoal=index;const g=activeTrip.goals[index];pendingPhoto=g.photo;$('#dialogTitle').textContent=`Ziel ${index+1}`;$('#goalNameInput').value=g.name||'';$('#goalInfoInput').value=g.info||'';$('#goalTimeInput').value=toLocalDateTimeValue(g.capturedAt);renderDialogPhoto();renderPlaceFields();$('#goalDialog').showModal()}
-function renderDialogPhoto(){const p=$('#dialogPhotoPreview');p.style.backgroundImage=pendingPhoto?`url(${pendingPhoto})`:'';p.innerHTML=pendingPhoto?'':'<span>Noch kein Foto</span>';$('#removePhotoBtn').disabled=!pendingPhoto}
-function readFileAsDataURL(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(file)})}
-async function finishToggle(){if(activeTrip.completed){activeTrip.completed=false;await saveTrip(false);renderTracker();toast('Tracker wieder zur Bearbeitung geöffnet.');return}const missing=activeTrip.goals.filter(g=>!g.photo).length;if(missing){toast(`Noch ${missing} ${missing===1?'Ziel ist':'Ziele sind'} ohne Foto.`);return}activeTrip.completed=true;layoutMode=false;selectedGoal=null;await saveTrip(false);renderTracker();toast('Tracker abgeschlossen. PDF und Teilen sind freigeschaltet.')}
-function loadScript(src){return new Promise((res,rej)=>{if(document.querySelector(`script[src="${src}"]`))return res();const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
-async function downloadPDF(){if(!activeTrip?.completed){toast('Schließe den Tracker zuerst ab.');return}toast('PDF wird erzeugt …');try{await loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');await loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js');const board=$('#trackerBoard');board.classList.add('pdf-capture');const canvas=await html2canvas(board,{scale:2,useCORS:true,backgroundColor:null,logging:false});board.classList.remove('pdf-capture');const img=canvas.toDataURL('image/jpeg',.94),pdf=new jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});pdf.addImage(img,'JPEG',0,0,210,297,undefined,'FAST');pdf.save(`${slug(activeTrip.title)}.pdf`);toast('PDF heruntergeladen.')}catch(err){console.error(err);toast('PDF-Bibliothek nicht erreichbar. Druckansicht wird geöffnet.');window.print()}}
-/* createShareHTML wird weiter unten durch die animierte Präsentationsversion definiert. */
-function createShareHTML(t,shareBackground){
- const goals=t.goals.filter(g=>g.photo);
- const who=(t.participants||[]).filter(Boolean).join(', ')||'uns';
- const radios=['<input class="state-radio" type="radio" name="stage" id="introState" checked>'].concat(goals.map((_,i)=>`<input class="state-radio" type="radio" name="stage" id="stepState${i+1}">`)).join('');
- const slides=goals.map((g,i)=>{
-   const prev=i>0?`<label class="nav prev" for="stepState${i}" aria-label="Vorheriges Ziel">‹</label>`:'';
-   const next=i<goals.length-1?`<label class="nav next" for="stepState${i+2}" aria-label="Nächstes Ziel">›</label>`:'';
-   const dt=g.capturedAt?new Date(g.capturedAt):null;
-   const meta=dt&&!isNaN(dt)?`${dt.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})} · ${dt.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr`:'';
-   const info=g.info?`<section class="info-panel"><p>${safeText(g.info)}</p></section>`:'';
-   const place=g.place?.name?`<a class="share-place-chip" href="${safeText(g.place.url||mapsSearchUrl(g.place.name))}" target="_blank" rel="noopener">⌖ ${safeText(g.place.name)}</a>`:'';
-   return `<section class="slide slide-${i+1}">
-     <div class="slide-shell">
-       <header class="destination-title"><span>ZIEL ${i+1}</span><h2>${safeText(g.name)}</h2></header>
-       <article class="memory-card">
-         <input class="lightbox-toggle" type="checkbox" id="photoToggle${i+1}">
-         <div class="photo-wrap"><label class="photo-frame" for="photoToggle${i+1}" aria-label="Foto vergrößern"><img src="${g.photo}" alt="${safeText(g.name)}"></label>${place}</div>
-         <div class="date-row">${meta}</div>
-         <div class="lightbox"><label class="lightbox-bg" for="photoToggle${i+1}"></label><div class="lightbox-inner"><img src="${g.photo}" alt="${safeText(g.name)}"></div><label class="close" for="photoToggle${i+1}" aria-label="Schließen">×</label></div>
-       </article>
-       ${info}
-     </div>
-     <nav class="bottom-nav">${prev}${next}</nav>
-   </section>`;
- }).join('');
- let stateCss='';
- for(let n=1;n<=goals.length;n++){
-   for(let j=1;j<=goals.length;j++){
-     const pos=j<n?'-112vw':j>n?'112vw':'0';
-     const op=j===n?'1':'0';
-     const pe=j===n?'auto':'none';
-     stateCss+=`#stepState${n}:checked~.experience .slide-${j}{transform:translate3d(${pos},0,0);opacity:${op};pointer-events:${pe}}`;
-   }
-   stateCss+=`#stepState${n}:checked~.experience .intro{transform:translate3d(-112vw,0,0);opacity:0;pointer-events:none}`;
- }
- return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><meta name="theme-color" content="#0f172a"><title>${safeText(t.title)} · Travel Tracker</title><style>
- *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden!important;overscroll-behavior:none;background:#0f172a}html{position:fixed;inset:0}body{position:fixed;inset:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#fff;touch-action:manipulation}
- .state-radio{position:fixed;opacity:0;pointer-events:none}
- .experience{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;overflow:hidden;background:${shareBackground};background-size:cover;background-position:center;background-repeat:no-repeat}
- .experience:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(2,6,23,.16),rgba(2,6,23,.03) 48%,rgba(2,6,23,.34));pointer-events:none;z-index:0}
- .intro,.slide{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;z-index:2;transition:transform .7s cubic-bezier(.22,.78,.22,1),opacity .35s ease;will-change:transform,opacity}
- .intro{display:grid;place-items:center;text-align:center;padding:max(18px,env(safe-area-inset-top)) 24px max(18px,env(safe-area-inset-bottom));transform:translate3d(0,0,0);opacity:1}
- .welcome{width:min(88vw,760px);text-shadow:0 3px 24px #0008}.welcome .eyebrow{font-weight:900;letter-spacing:.16em;font-size:12px}.welcome h1{font-size:clamp(34px,8vw,72px);line-height:.98;margin:14px 0 10px;letter-spacing:-.05em}.welcome h2{font-size:clamp(21px,5vw,38px);margin:0 0 12px}.welcome p{font-size:clamp(15px,2.4vw,20px);line-height:1.4;margin:0 auto 24px;max-width:640px}.start{display:inline-flex;align-items:center;gap:10px;border-radius:999px;background:#fff;color:#111827;font-weight:900;font-size:16px;padding:14px 22px;box-shadow:0 12px 40px #0005;cursor:pointer}
- .slide{transform:translate3d(112vw,0,0);opacity:0;pointer-events:none;padding:max(14px,env(safe-area-inset-top)) 18px max(12px,env(safe-area-inset-bottom))}
- .slide-shell{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(88vw,520px);max-height:calc(100dvh - max(90px,env(safe-area-inset-top)) - max(86px,env(safe-area-inset-bottom)));display:flex;flex-direction:column;align-items:stretch;gap:clamp(10px,1.7dvh,18px)}
- .destination-title{flex:0 0 auto;text-align:center;padding:0 8px;text-shadow:0 3px 18px #0008}.destination-title span{display:block;font-size:10px;font-weight:900;letter-spacing:.18em;opacity:.86;margin-bottom:4px}.destination-title h2{margin:0;font-size:clamp(24px,6vw,38px);line-height:1.02;letter-spacing:-.035em}
- .memory-card{flex:0 0 auto;width:100%;padding:clamp(9px,2vw,13px);background:rgba(255,255,255,.94);border:1px solid rgba(255,255,255,.75);border-radius:22px;box-shadow:0 20px 55px #0005;color:#172033;backdrop-filter:blur(8px)}
- .photo-wrap{position:relative}.photo-frame{display:block;position:relative;width:100%;aspect-ratio:16/9;border-radius:15px;overflow:hidden;background:#d9e1ea;cursor:zoom-in}.photo-frame img{width:100%;height:100%;display:block;object-fit:cover}.share-place-chip{position:absolute;z-index:4;left:9px;bottom:9px;max-width:calc(100% - 18px);padding:7px 10px;border-radius:999px;background:rgba(15,23,42,.82);color:#fff;text-decoration:none;font-size:11px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 5px 18px #0006}
- .date-row{text-align:center;padding:clamp(9px,1.6dvh,14px) 6px 2px;color:#667085;font-size:clamp(11px,2.8vw,14px);font-weight:800}
- .info-panel{flex:0 1 auto;min-height:0;width:100%;background:rgba(255,255,255,.94);color:#344054;border:1px solid rgba(255,255,255,.72);border-radius:18px;box-shadow:0 14px 38px #0003;padding:clamp(12px,2.2vw,18px);overflow:auto;overscroll-behavior:contain}.info-panel p{margin:0;font-size:clamp(13px,3.1vw,16px);line-height:1.45;white-space:pre-wrap}
- .bottom-nav{position:absolute;z-index:10;left:max(16px,env(safe-area-inset-left));right:max(16px,env(safe-area-inset-right));bottom:max(10px,env(safe-area-inset-bottom));height:58px;pointer-events:none}.nav{position:absolute;bottom:0;display:grid;place-items:center;width:62px;height:58px;font-size:64px;line-height:.7;color:rgba(255,255,255,.72);text-decoration:none;text-shadow:0 3px 14px #000c;cursor:pointer;pointer-events:auto;user-select:none;-webkit-tap-highlight-color:transparent}.prev{left:0}.next{right:0;color:#fff;animation:nextGlow 1.55s ease-in-out infinite}@keyframes nextGlow{0%,100%{text-shadow:0 0 8px #fff5,0 3px 14px #000c;transform:translateX(0)}50%{text-shadow:0 0 19px #fff,0 0 38px #ffffffc0,0 3px 14px #000c;transform:translateX(5px)}}
- .lightbox-toggle{position:absolute;opacity:0;pointer-events:none}.lightbox{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;visibility:hidden;opacity:0;pointer-events:none;transition:.2s}.lightbox-bg{position:absolute;inset:0;background:#030712f7}.lightbox-inner{position:relative;z-index:2;width:100vw;height:100dvh;display:flex;align-items:center;justify-content:center;padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}.lightbox-inner img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}.close{position:absolute;z-index:3;right:max(12px,env(safe-area-inset-right));top:max(12px,env(safe-area-inset-top));width:46px;height:46px;border-radius:50%;background:#fff;color:#111827;font-size:29px;display:grid;place-items:center;cursor:pointer}.lightbox-toggle:checked~.lightbox{visibility:visible;opacity:1;pointer-events:auto}
- #introState:checked~.experience .intro{transform:translate3d(0,0,0);opacity:1;pointer-events:auto}#introState:checked~.experience .slide{transform:translate3d(112vw,0,0);opacity:0;pointer-events:none}${stateCss}
- @media(max-height:700px){.slide-shell{gap:8px;max-height:calc(100dvh - 132px)}.destination-title h2{font-size:clamp(21px,5.5vw,31px)}.memory-card{padding:8px}.date-row{padding:7px 4px 1px}.info-panel{padding:10px}.info-panel p{font-size:12px;line-height:1.35}}
- @media(orientation:landscape) and (max-height:560px){.slide-shell{width:min(68vw,600px);max-height:calc(100dvh - 70px);gap:6px}.destination-title span{display:none}.destination-title h2{font-size:22px}.memory-card{width:min(58vw,520px);align-self:center;padding:7px;border-radius:15px}.photo-frame{border-radius:10px}.date-row{padding:5px 4px 0;font-size:11px}.info-panel{max-height:18dvh;padding:8px 12px}.info-panel p{font-size:11px}.bottom-nav{height:46px}.nav{height:44px;font-size:52px}.lightbox-inner{padding:4px}}
- @media(prefers-reduced-motion:reduce){.intro,.slide{transition-duration:.01ms}.next{animation:none}}
- </style></head><body>${radios}<main class="experience">${slides}<section class="intro"><div class="welcome"><div class="eyebrow">TRAVEL TRACKER</div><h1>Willkommen auf der Reise von</h1><h2>${safeText(who)}</h2><p>${safeText(t.title)}</p>${goals.length?'<label class="start" for="stepState1">Reise ansehen <span>→</span></label>':'<p>Keine Fotos vorhanden.</p>'}</div></section></main></body></html>`
-}
-async function shareBackgroundCss(t){const css=bgCss(t);if(!css.includes("assets/birthday-prototype.png"))return css;try{const r=await fetch('assets/birthday-prototype.png');const blob=await r.blob();const data=await readFileAsDataURL(blob);return `url('${data}') center/cover`}catch{return css}}
-async function shareTrip(){if(!activeTrip?.completed){toast('Schließe den Tracker zuerst ab.');return}const shareBackground=await shareBackgroundCss(activeTrip);const html=createShareHTML(activeTrip,shareBackground),blob=new Blob([html],{type:'text/html'}),file=new File([blob],`${slug(activeTrip.title)}-travel-tracker.html`,{type:'text/html'});if(navigator.canShare&&navigator.share&&navigator.canShare({files:[file]})){try{await navigator.share({title:activeTrip.title,text:'Mein Travel Tracker',files:[file]});return}catch(e){if(e.name==='AbortError')return}}downloadBlob(blob,file.name);toast('Teilbare HTML-Ansicht heruntergeladen.')}
-async function previewTrip(){if(!activeTrip?.completed){toast('Schließe den Tracker zuerst ab.');return}await saveTrip(false);const url=new URL('viewer.html',window.location.href);url.searchParams.set('id',activeTrip.id);window.open(url.href,'_blank','noopener')}
-async function exportAll(){const trips=await dbAll();if(!trips.length){toast('Es gibt noch keine Tracker zum Exportieren.');return}downloadBlob(new Blob([JSON.stringify({app:'Travel Tracker',formatVersion:3,exportedAt:new Date().toISOString(),trips})],{type:'application/json'}),`travel-tracker-backup-${new Date().toISOString().slice(0,10)}.traveltracker`);toast(`${trips.length} Tracker exportiert.`)}
-async function importBackup(file){try{const data=JSON.parse(await file.text());if(data.app!=='Travel Tracker'||!Array.isArray(data.trips))throw Error();let count=0;for(const trip of data.trips){if(!trip.id||!Array.isArray(trip.goals))continue;ensureTripLayout(trip);trip.updatedAt=Date.now();await dbPut(trip);count++}await refreshHome();if(screens.library.classList.contains('active'))await renderLibrary();toast(`${count} Tracker importiert.`)}catch{toast('Diese Datei ist keine gültige Travel-Tracker-Sicherung.')}}
-function askDelete(t){$('#confirmTitle').textContent=`„${t.title}“ löschen?`;$('#confirmText').textContent='Der Tracker und seine lokal gespeicherten Fotos werden von diesem Gerät entfernt.';confirmCallback=async()=>{await dbDelete(t.id);await renderLibrary();await refreshHome();toast('Tracker gelöscht.')};$('#confirmDialog').showModal()}
-$('#newTripBtn').onclick=()=>{resetDraft();showScreen('categories')};$('#libraryBtn').onclick=()=>showScreen('library');$('#showAllBtn').onclick=()=>showScreen('library');$('#exportAllBtn').onclick=exportAll;$('#libraryExportBtn').onclick=exportAll;function chooseImport(){$('#importPicker').value='';$('#importPicker').click()}$('#importAllBtn').onclick=chooseImport;$('#libraryImportBtn').onclick=chooseImport;$('#libraryNewBtn').onclick=()=>{resetDraft();showScreen('categories')};$('#importPicker').onchange=e=>{const f=e.target.files?.[0];if(f)importBackup(f)};$('#brandHome').onclick=()=>showScreen('home');$('#topHomeBtn').onclick=()=>showScreen('home');$('#trackerHomeBtn').onclick=()=>showScreen('home');$$('[data-nav]').forEach(b=>b.onclick=()=>showScreen(b.dataset.nav));$$('[data-category]').forEach(b=>b.onclick=()=>chooseCategory(b.dataset.category));$('#decreaseGoals').onclick=()=>{draft.goalCount=Math.max(1,draft.goalCount-1);$('#goalCount').textContent=draft.goalCount};$('#increaseGoals').onclick=()=>{draft.goalCount=Math.min(10,draft.goalCount+1);$('#goalCount').textContent=draft.goalCount};$('#continueToLayoutBtn').onclick=()=>{renderLayoutChoices();showScreen('layouts')};$('#saveBtn').onclick=()=>saveTrip(true);$('#finishBtn').onclick=finishToggle;$('#previewTripBtn').onclick=previewTrip;$('#pdfBtn').onclick=downloadPDF;$('#shareFileBtn').onclick=shareTrip;
-$('#layoutEditBtn').onclick=()=>{layoutMode=!layoutMode;selectedGoal=null;renderTracker()};$('#doneLayoutBtn').onclick=async()=>{layoutMode=false;selectedGoal=null;await saveTrip(false);renderTracker();toast('Layout gespeichert.')};$('#rotateLeftBtn').onclick=()=>rotateSelected(-3);$('#rotateRightBtn').onclick=()=>rotateSelected(3);$('#rotationResetBtn').onclick=()=>rotateSelected(0);$('#entrySideSelect').onchange=e=>{if(selectedGoal===null)return;activeTrip.goals[selectedGoal].layout.entry=e.target.value;renderConnectors();saveTrip(false)};$('#exitSideSelect').onchange=e=>{if(selectedGoal===null)return;activeTrip.goals[selectedGoal].layout.exit=e.target.value;renderConnectors();saveTrip(false)};$('#lineStyleSelect').onchange=e=>{activeTrip.lineStyle=e.target.value;renderConnectors();saveTrip(false)};$('#resetLayoutBtn').onclick=resetLayout;
-function openCameraPicker(){$('#cameraPicker').value='';$('#cameraPicker').click()}function openPhotoPicker(){$('#photoPicker').value='';$('#photoPicker').click()}async function applyPickedPhoto(file,source='upload'){if(!file||editingGoal===null)return;pendingPhoto=await readFileAsDataURL(file);const g=activeTrip.goals[editingGoal];g.photo=pendingPhoto;g.capturedAt=Date.now();$('#goalTimeInput').value=toLocalDateTimeValue(g.capturedAt);activeTrip.completed=false;await saveTrip(false);renderDialogPhoto();renderTracker();toast('Foto lokal gespeichert.')}$('#takePhotoBtn').onclick=openCameraPicker;$('#choosePhotoBtn').onclick=openPhotoPicker;$('#removePhotoBtn').onclick=async()=>{pendingPhoto=null;if(editingGoal!==null){const g=activeTrip.goals[editingGoal];g.photo=null;activeTrip.completed=false;await saveTrip(false);renderTracker()}renderDialogPhoto();renderPlaceFields()};$('#cameraPicker').onchange=async e=>{const f=e.target.files?.[0];if(f)await applyPickedPhoto(f,'camera')};$('#photoPicker').onchange=async e=>{const f=e.target.files?.[0];if(f)await applyPickedPhoto(f,'upload')};$('#goalForm').addEventListener('submit',async e=>{if(e.submitter?.value==='cancel'||editingGoal===null)return;const g=activeTrip.goals[editingGoal];g.name=$('#goalNameInput').value.trim()||`Ziel ${editingGoal+1}`;g.photo=pendingPhoto;g.info=$('#goalInfoInput').value.trim();g.capturedAt=fromLocalDateTimeValue($('#goalTimeInput').value)||g.capturedAt||Date.now();const placeName=$('#goalPlaceInput').value.trim(),mapsUrl=$('#goalMapsUrlInput').value.trim();g.place=placeName?{name:placeName,url:normalizedMapsUrl(mapsUrl,placeName)}:null;activeTrip.completed=false;await saveTrip(false);renderTracker();toast('Ziel gespeichert.')});$('#confirmActionBtn').onclick=()=>{if(confirmCallback)confirmCallback();confirmCallback=null};
-$('#decreasePeople').onclick=()=>{draft.peopleCount=Math.max(1,draft.peopleCount-1);$('#peopleCount').textContent=draft.peopleCount;renderParticipantFields()};
-$('#increasePeople').onclick=()=>{draft.peopleCount=Math.min(12,draft.peopleCount+1);$('#peopleCount').textContent=draft.peopleCount;renderParticipantFields()};
+(() => {
+  'use strict';
 
-refreshHome();
+  const DB_NAME = 'travelTrackerDB';
+  const DB_VERSION = 1;
+  const STORE = 'trips';
+  const CATEGORY_LABELS = { travel:'Reise', hiking:'Wandern', birthday:'Geburtstag' };
 
-$('#searchMapsBtn').onclick=()=>{const q=$('#goalPlaceInput').value.trim();if(!q){toast('Gib zuerst einen Ort oder eine Adresse ein.');$('#goalPlaceInput').focus();return}const u=mapsSearchUrl(q);$('#goalMapsUrlInput').value=u;window.open(u,'_blank','noopener')};
-$('#removePlaceBtn').onclick=()=>{$('#goalPlaceInput').value='';$('#goalMapsUrlInput').value='';if(editingGoal!==null){activeTrip.goals[editingGoal].place=null;saveTrip(false)}renderPlaceFields();toast('Ort entfernt.')};
+  const BACKGROUNDS = {
+    travel: [
+      {id:'travel-sunset', name:'Sunset Journey', css:'linear-gradient(145deg,#14213d 0%,#4f5f8b 36%,#e78b6c 70%,#f2c879 100%)'},
+      {id:'travel-ocean', name:'Ocean Route', css:'linear-gradient(150deg,#09203f 0%,#1b7a9e 43%,#8ac6c5 72%,#eee2b3 100%)'},
+      {id:'travel-pastel', name:'Pastel Trip', css:'linear-gradient(135deg,#6c5b9f 0%,#cf5f91 47%,#dfaa58 100%)'}
+    ],
+    hiking: [
+      {id:'hiking-forest', name:'Forest Trail', css:'linear-gradient(145deg,#173b2d 0%,#426b4f 42%,#8e9d68 72%,#d4c797 100%)'},
+      {id:'hiking-mountain', name:'Mountain Air', css:'linear-gradient(145deg,#40576f 0%,#83a2b5 42%,#bac9bd 68%,#d7c08b 100%)'},
+      {id:'hiking-earth', name:'Earth Walk', css:'linear-gradient(140deg,#4b3c2d 0%,#806648 43%,#a79362 67%,#687c63 100%)'}
+    ],
+    birthday: [
+      {id:'birthday-balloons', name:'Ballon-Party', css:"url('assets/birthday-balloons.png') center/cover no-repeat"},
+      {id:'birthday-neon', name:'Neon Party', css:'linear-gradient(135deg,#352058 0%,#8d3a95 40%,#e05c81 70%,#f3aa5c 100%)'},
+      {id:'birthday-confetti', name:'Konfetti', css:'linear-gradient(145deg,#4f52c7 0%,#8b65d6 34%,#e76a9d 68%,#f4be67 100%)'}
+    ]
+  };
+
+  const LAYOUTS = {
+    zigzag: {name:'Zickzack', desc:'Klassischer Reiseweg mit abwechselnden Stationen'},
+    flow: {name:'Fließend', desc:'Ruhiger Verlauf mit weichen Abständen'},
+    collage: {name:'Collage', desc:'Lebendiger und etwas verspielter'}
+  };
+
+  const els = id => document.getElementById(id);
+  const screens = [...document.querySelectorAll('.screen')];
+  let currentTrip = null;
+  let editGoalIndex = -1;
+  let selectedGoalIndex = -1;
+  let layoutMode = false;
+  let confirmCallback = null;
+  let wizard = {category:'travel', background:null, title:'', people:1, participants:[''], goalCount:6, layout:'zigzag'};
+
+  function uuid() {
+    return (crypto.randomUUID?.() || `tt-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  }
+
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, {keyPath:'id'});
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function dbPut(trip) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE,'readwrite');
+      tx.objectStore(STORE).put(trip);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function dbGet(id) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE,'readonly').objectStore(STORE).get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function dbAll() {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE,'readonly').objectStore(STORE).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function dbDelete(id) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE,'readwrite');
+      tx.objectStore(STORE).delete(id);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  function safe(value='') {
+    return String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  }
+
+  function showScreen(name) {
+    screens.forEach(s => s.classList.toggle('active', s.id === `screen${name[0].toUpperCase()}${name.slice(1)}`));
+    window.scrollTo({top:0, behavior:'instant'});
+  }
+
+  function toast(message) {
+    const t = els('toast');
+    t.textContent = message;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 2400);
+  }
+
+  function nowLocalInput() {
+    const d = new Date();
+    const p = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  function toIsoFromLocalInput(value) {
+    if (!value) return null;
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+
+  function toLocalInput(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    const p = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  function mapsSearchUrl(place) {
+    return place ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}` : 'https://www.google.com/maps';
+  }
+
+  function normalizeMapsUrl(value, place) {
+    const v = (value || '').trim();
+    if (v) {
+      try {
+        const u = new URL(v);
+        if (u.protocol === 'http:' || u.protocol === 'https:') return u.href;
+      } catch {}
+    }
+    return mapsSearchUrl(place);
+  }
+
+  function presetPositions(count, layout='zigzag') {
+    const zig = [[24,23,-5],[72,29,5],[35,43,-2],[70,52,4],[25,66,-4],[63,72,3],[32,82,-3],[74,84,4],[43,91,-2],[69,92,2]];
+    const flow = [[26,24,-2],[64,31,3],[39,42,-2],[69,50,2],[31,60,-3],[66,67,2],[37,76,-2],[71,82,2],[43,89,-1],[70,91,1]];
+    const collage = [[26,24,-7],[69,27,7],[38,41,3],[72,49,-5],[25,60,6],[63,66,-2],[34,76,-6],[72,81,5],[44,89,3],[70,91,-3]];
+    const source = layout === 'flow' ? flow : layout === 'collage' ? collage : zig;
+    return source.slice(0,count).map((v,i)=>({x:v[0],y:v[1],rotation:v[2],entrySide:'auto',exitSide:'auto',index:i}));
+  }
+
+  async function saveCurrentTrip(message='Lokal gespeichert') {
+    if (!currentTrip) return;
+    currentTrip.updatedAt = new Date().toISOString();
+    await dbPut(currentTrip);
+    els('saveState').textContent = message;
+    refreshHome();
+  }
+
+  async function refreshHome() {
+    const trips = (await dbAll()).sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0));
+    els('libraryCount').textContent = trips.length ? `${trips.length} gespeicherte${trips.length===1?'r Tracker':' Tracker'}` : 'Noch keine gespeicherten Tracker';
+    renderTripCards(els('recentTrips'), trips.slice(0,3), true);
+    renderTripCards(els('tripLibrary'), trips, false);
+  }
+
+  function renderTripCards(container, trips, compact) {
+    if (!trips.length) {
+      container.innerHTML = `<div class="empty-card">Noch keine Tracker vorhanden.</div>`;
+      return;
+    }
+    container.innerHTML = trips.map(t => {
+      const filled = (t.goals||[]).filter(g=>g.photo).length;
+      const total = (t.goals||[]).length;
+      return `<article class="trip-card" data-trip-id="${safe(t.id)}">
+        <button class="delete-mini" type="button" data-delete-id="${safe(t.id)}" aria-label="${safe(t.title)} löschen">×</button>
+        <button class="trip-card-main" type="button" data-open-id="${safe(t.id)}">
+          <div class="trip-thumb" style="background:${t.backgroundCss || '#dbe4ef'}"></div>
+          <div class="trip-card-copy"><strong>${safe(t.title || 'Ohne Titel')}</strong><small>${safe(CATEGORY_LABELS[t.category]||'Tracker')} · ${filled}/${total} Ziele${t.completed?' · abgeschlossen':''}</small></div>
+        </button>
+      </article>`;
+    }).join('');
+    container.querySelectorAll('[data-open-id]').forEach(btn => btn.addEventListener('click', () => openTrip(btn.dataset.openId)));
+    container.querySelectorAll('[data-delete-id]').forEach(btn => btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = btn.dataset.deleteId;
+      const trip = trips.find(t=>t.id===id);
+      askConfirm(`„${trip?.title || 'Diese Reise'}“ löschen?`, 'Die Reise und alle darin lokal gespeicherten Fotos werden von diesem Gerät gelöscht.', async () => {
+        await dbDelete(id);
+        if (currentTrip?.id === id) currentTrip = null;
+        await refreshHome();
+        toast('Reise gelöscht.');
+      });
+    }));
+  }
+
+  function askConfirm(title, text, cb) {
+    els('confirmTitle').textContent = title;
+    els('confirmText').textContent = text;
+    confirmCallback = cb;
+    els('confirmDialog').showModal();
+  }
+
+  function resetWizard() {
+    wizard = {category:'travel', background:null, title:'', people:1, participants:[''], goalCount:6, layout:'zigzag'};
+    els('projectTitle').value = '';
+    els('peopleCount').value = '1';
+    els('goalCount').value = '6';
+    renderParticipantFields();
+  }
+
+  function renderBackgrounds() {
+    const items = BACKGROUNDS[wizard.category] || BACKGROUNDS.travel;
+    els('backgroundGrid').innerHTML = items.map(bg => `<button class="background-card" type="button" data-bg-id="${bg.id}"><div class="background-preview" style="background:${bg.css}"></div><strong>${safe(bg.name)}</strong><small>Als Hintergrund verwenden</small></button>`).join('');
+    els('backgroundGrid').querySelectorAll('[data-bg-id]').forEach(btn => btn.addEventListener('click', () => {
+      wizard.background = items.find(x=>x.id===btn.dataset.bgId);
+      showScreen('setup');
+    }));
+  }
+
+  function renderParticipantFields() {
+    wizard.participants.length = wizard.people;
+    while (wizard.participants.length < wizard.people) wizard.participants.push('');
+    els('participantFields').innerHTML = Array.from({length:wizard.people},(_,i)=>`<label class="field-label">Person ${i+1}<input data-person-index="${i}" maxlength="40" placeholder="Name" value="${safe(wizard.participants[i]||'')}"></label>`).join('');
+    els('participantFields').querySelectorAll('[data-person-index]').forEach(inp => inp.addEventListener('input',()=>{wizard.participants[Number(inp.dataset.personIndex)] = inp.value;}));
+  }
+
+  function renderLayouts() {
+    els('layoutGrid').innerHTML = Object.entries(LAYOUTS).map(([key,val]) => {
+      const p = presetPositions(5,key);
+      return `<button class="layout-card" data-layout="${key}" type="button"><div class="layout-preview">${p.map(pos=>`<span class="layout-dot" style="left:${pos.x}%;top:${pos.y}%;transform:translate(-50%,-50%) rotate(${pos.rotation}deg)"></span>`).join('')}</div><strong>${val.name}</strong><small>${val.desc}</small></button>`;
+    }).join('');
+    els('layoutGrid').querySelectorAll('[data-layout]').forEach(btn => btn.addEventListener('click', async () => {
+      wizard.layout = btn.dataset.layout;
+      await createTripFromWizard();
+    }));
+  }
+
+  async function createTripFromWizard() {
+    const pos = presetPositions(wizard.goalCount, wizard.layout);
+    currentTrip = {
+      id:uuid(),
+      title:wizard.title || `${CATEGORY_LABELS[wizard.category]} ${new Date().toLocaleDateString('de-DE')}`,
+      category:wizard.category,
+      backgroundId:wizard.background?.id || BACKGROUNDS[wizard.category][0].id,
+      backgroundCss:wizard.background?.css || BACKGROUNDS[wizard.category][0].css,
+      participants:wizard.participants.map(x=>x.trim()).filter(Boolean),
+      layout:wizard.layout,
+      lineStyle:'dashed',
+      completed:false,
+      createdAt:new Date().toISOString(),
+      updatedAt:new Date().toISOString(),
+      goals:Array.from({length:wizard.goalCount},(_,i)=>({
+        id:uuid(), name:`Ziel ${i+1}`, info:'', capturedAt:null, photo:null, location:null,
+        x:pos[i].x, y:pos[i].y, rotation:pos[i].rotation, entrySide:'auto', exitSide:'auto'
+      }))
+    };
+    await dbPut(currentTrip);
+    openTrackerScreen();
+  }
+
+  async function openTrip(id) {
+    currentTrip = await dbGet(id);
+    if (!currentTrip) return toast('Tracker nicht gefunden.');
+    // Normalize older objects.
+    currentTrip.goals = (currentTrip.goals || []).map((g,i)=>({id:g.id||uuid(),name:g.name||`Ziel ${i+1}`,info:g.info||'',capturedAt:g.capturedAt||null,photo:g.photo||null,location:g.location||null,x:g.x??presetPositions(currentTrip.goals.length,currentTrip.layout||'zigzag')[i]?.x??50,y:g.y??presetPositions(currentTrip.goals.length,currentTrip.layout||'zigzag')[i]?.y??50,rotation:g.rotation||0,entrySide:g.entrySide||'auto',exitSide:g.exitSide||'auto'}));
+    currentTrip.lineStyle ||= 'dashed';
+    openTrackerScreen();
+  }
+
+  function openTrackerScreen() {
+    layoutMode = false;
+    selectedGoalIndex = -1;
+    els('layoutEditor').classList.add('hidden');
+    els('trackerCategoryLabel').textContent = (CATEGORY_LABELS[currentTrip.category]||'Tracker').toUpperCase();
+    els('trackerTitle').textContent = currentTrip.title;
+    els('boardBadge').textContent = (CATEGORY_LABELS[currentTrip.category]||'Tracker').toUpperCase();
+    els('boardTitle').textContent = currentTrip.title;
+    els('trackerBoard').style.background = currentTrip.backgroundCss || '#d7dde6';
+    els('lineStyleSelect').value = currentTrip.lineStyle || 'dashed';
+    renderGoals();
+    showScreen('tracker');
+  }
+
+  function renderGoals() {
+    const canvas = els('goalsCanvas');
+    canvas.innerHTML = currentTrip.goals.map((g,i)=>{
+      const photo = g.photo ? `<img src="${g.photo}" alt="${safe(g.name)}">` : `<div class="goal-placeholder">Foto ${i+1}</div>`;
+      const loc = g.location?.label ? `<span class="goal-location-badge">⌖ ${safe(g.location.label)}</span>` : '';
+      return `<div class="goal-anchor ${selectedGoalIndex===i?'selected':''}" data-goal-index="${i}" style="left:${g.x}%;top:${g.y}%"><div class="goal-card-visual" style="transform:rotate(${g.rotation||0}deg)"><span class="goal-number">${i+1}</span>${photo}${loc}<div class="goal-card-meta"><strong>${safe(g.name||`Ziel ${i+1}`)}</strong><small>${g.photo?'Erinnerung gespeichert':'Antippen zum Bearbeiten'}</small></div></div></div>`;
+    }).join('');
+    canvas.querySelectorAll('.goal-anchor').forEach(anchor => {
+      const idx = Number(anchor.dataset.goalIndex);
+      if (layoutMode) bindDrag(anchor, idx);
+      else anchor.addEventListener('click', () => openGoalDialog(idx));
+    });
+    updateProgress();
+    requestAnimationFrame(drawJourneyPath);
+  }
+
+  function updateProgress() {
+    const done = currentTrip.goals.filter(g=>g.photo).length;
+    const total = currentTrip.goals.length;
+    els('progressText').textContent = `${done} / ${total}`;
+    els('progressBar').style.width = `${total ? done/total*100 : 0}%`;
+    els('completeActions').classList.toggle('hidden', !currentTrip.completed);
+    els('finishBtn').textContent = currentTrip.completed ? 'Abgeschlossen' : 'Tracker abschließen';
+  }
+
+  function sidePoint(goal, side, other) {
+    const auto = () => {
+      const dx = other.x-goal.x, dy = other.y-goal.y;
+      if (Math.abs(dx)>Math.abs(dy)) return dx>0?'right':'left';
+      return dy>0?'bottom':'top';
+    };
+    const s = side==='auto'?auto():side;
+    const halfW=15.5, halfH=8;
+    if(s==='left') return [goal.x-halfW,goal.y];
+    if(s==='right') return [goal.x+halfW,goal.y];
+    if(s==='top') return [goal.x,goal.y-halfH];
+    return [goal.x,goal.y+halfH];
+  }
+
+  function drawJourneyPath() {
+    const svg = els('journeyPath');
+    if (!currentTrip || currentTrip.lineStyle==='none') { svg.innerHTML=''; return; }
+    const goals = currentTrip.goals;
+    let html='';
+    for(let i=0;i<goals.length-1;i++){
+      const a=goals[i], b=goals[i+1];
+      const p1=sidePoint(a,a.exitSide||'auto',b), p2=sidePoint(b,b.entrySide||'auto',a);
+      const x1=p1[0]*10,y1=p1[1]*14.14,x2=p2[0]*10,y2=p2[1]*14.14;
+      const dx=(x2-x1)*.45;
+      const d=`M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+      const dash=currentTrip.lineStyle==='dashed'?'16 14':'none';
+      html += `<path d="${d}" fill="none" stroke="#152437" stroke-width="4" stroke-linecap="round" stroke-dasharray="${dash}" opacity=".92"/>`;
+    }
+    svg.innerHTML=html;
+  }
+
+  function bindDrag(anchor, idx) {
+    let startX=0,startY=0,startGX=0,startGY=0,moved=false;
+    anchor.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      selectedGoalIndex=idx;
+      renderSelectionControls();
+      document.querySelectorAll('.goal-anchor').forEach(x=>x.classList.remove('selected'));
+      anchor.classList.add('selected');
+      const board=els('trackerBoard').getBoundingClientRect();
+      startX=e.clientX;startY=e.clientY;startGX=currentTrip.goals[idx].x;startGY=currentTrip.goals[idx].y;moved=false;
+      anchor.setPointerCapture(e.pointerId);
+      const move=ev=>{
+        moved=true;
+        const nx=Math.max(16,Math.min(84,startGX+(ev.clientX-startX)/board.width*100));
+        const ny=Math.max(14,Math.min(91,startGY+(ev.clientY-startY)/board.height*100));
+        currentTrip.goals[idx].x=nx;currentTrip.goals[idx].y=ny;
+        anchor.style.left=`${nx}%`;anchor.style.top=`${ny}%`;drawJourneyPath();
+      };
+      const up=async ev=>{anchor.removeEventListener('pointermove',move);anchor.removeEventListener('pointerup',up);anchor.removeEventListener('pointercancel',up);if(moved) await saveCurrentTrip();};
+      anchor.addEventListener('pointermove',move);anchor.addEventListener('pointerup',up);anchor.addEventListener('pointercancel',up);
+    });
+  }
+
+  function renderSelectionControls() {
+    const g = currentTrip?.goals?.[selectedGoalIndex];
+    els('selectedGoalLabel').textContent = g ? g.name : 'Keines';
+    els('entrySideSelect').value = g?.entrySide || 'auto';
+    els('exitSideSelect').value = g?.exitSide || 'auto';
+  }
+
+  function openGoalDialog(index) {
+    editGoalIndex=index;
+    const g=currentTrip.goals[index];
+    els('dialogTitle').textContent=g.name || `Ziel ${index+1}`;
+    els('goalNameInput').value=g.name || '';
+    els('goalTimeInput').value=toLocalInput(g.capturedAt);
+    els('goalInfoInput').value=g.info || '';
+    els('placeNameInput').value=g.location?.label || '';
+    els('mapsUrlInput').value=g.location?.mapsUrl || '';
+    els('removePlaceBtn').classList.toggle('hidden',!g.location?.label && !g.location?.mapsUrl);
+    updateMapsLink();
+    els('mapPreviewWrap').classList.add('hidden');
+    renderDialogPhoto(g.photo);
+    els('removePhotoBtn').classList.toggle('hidden',!g.photo);
+    els('goalDialog').showModal();
+  }
+
+  function renderDialogPhoto(photo) {
+    els('dialogPhotoPreview').innerHTML = photo ? `<img src="${photo}" alt="Vorschau">` : '<span>Noch kein Foto</span>';
+  }
+
+  async function fileToDataURL(file) {
+    return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(file);});
+  }
+
+  async function applyPickedPhoto(file) {
+    if (!file || editGoalIndex<0) return;
+    const data=await fileToDataURL(file);
+    const g=currentTrip.goals[editGoalIndex];
+    g.photo=data;
+    if(!g.capturedAt){g.capturedAt=new Date().toISOString();els('goalTimeInput').value=nowLocalInput();}
+    renderDialogPhoto(data);
+    els('removePhotoBtn').classList.remove('hidden');
+    await saveCurrentTrip('Foto gespeichert');
+  }
+
+  function updateMapsLink() {
+    const place=els('placeNameInput').value.trim();
+    els('openMapsSearchLink').href=mapsSearchUrl(place);
+  }
+
+  function showMapPreview() {
+    const place=els('placeNameInput').value.trim();
+    if(!place){toast('Bitte zuerst einen Ort eingeben.');els('placeNameInput').focus();return;}
+    // Key-free preview. The direct Google Maps link remains the reliable fallback.
+    els('mapPreviewFrame').src=`https://www.google.com/maps?q=${encodeURIComponent(place)}&output=embed`;
+    els('mapPreviewWrap').classList.remove('hidden');
+  }
+
+  async function saveGoalFromDialog() {
+    if(editGoalIndex<0)return;
+    const g=currentTrip.goals[editGoalIndex];
+    g.name=els('goalNameInput').value.trim() || `Ziel ${editGoalIndex+1}`;
+    g.capturedAt=toIsoFromLocalInput(els('goalTimeInput').value) || g.capturedAt || null;
+    g.info=els('goalInfoInput').value.trim();
+    const place=els('placeNameInput').value.trim();
+    const custom=els('mapsUrlInput').value.trim();
+    g.location = (place || custom) ? {label:place || 'Google Maps', mapsUrl:normalizeMapsUrl(custom,place)} : null;
+    await saveCurrentTrip();
+    renderGoals();
+    els('goalDialog').close();
+  }
+
+  function getBackgroundCssById(category,id) {
+    return (BACKGROUNDS[category]||[]).find(x=>x.id===id)?.css || BACKGROUNDS[category]?.[0]?.css || '#d7dde6';
+  }
+
+  async function exportAll() {
+    const trips=await dbAll();
+    if(!trips.length)return toast('Es gibt noch keine Tracker zum Exportieren.');
+    downloadBlob(new Blob([JSON.stringify({version:2,exportedAt:new Date().toISOString(),trips},null,2)],{type:'application/json'}),`travel-tracker-sicherung-${new Date().toISOString().slice(0,10)}.traveltracker`);
+  }
+
+  async function importAllFile(file) {
+    try{
+      const data=JSON.parse(await file.text());
+      const trips=Array.isArray(data)?data:data.trips;
+      if(!Array.isArray(trips))throw new Error('Ungültiges Sicherungsformat');
+      for(const t of trips){ if(t && t.id) await dbPut(t); }
+      await refreshHome();
+      toast(`${trips.length} Tracker importiert.`);
+    }catch(e){toast('Sicherung konnte nicht importiert werden.');}
+  }
+
+  function downloadBlob(blob,filename) {
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }
+
+  function slugify(s) {return (s||'reise').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60)||'reise';}
+
+  async function backgroundCssForStandalone(css) {
+    const m=/url\(['"]?([^'")]+)['"]?\)/.exec(css||'');
+    if(!m || /^data:/.test(m[1]) || /^https?:/.test(m[1])) return css;
+    try{
+      const res=await fetch(m[1]);
+      const blob=await res.blob();
+      const data=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(blob);});
+      return css.replace(m[1],data);
+    }catch{return css;}
+  }
+
+  async function buildStandaloneViewer(trip) {
+    const [css,js]=await Promise.all([fetch('viewer.css').then(r=>r.text()),fetch('viewer.js').then(r=>r.text())]);
+    const clone=(typeof structuredClone==='function')?structuredClone(trip):JSON.parse(JSON.stringify(trip));
+    clone.backgroundCss=await backgroundCssForStandalone(clone.backgroundCss||'');
+    const json=JSON.stringify(clone).replace(/<\/script/gi,'<\\/script');
+    return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><meta name="theme-color" content="#0f172a"><title>${safe(trip.title)} · Travel Tracker</title><style>${css}</style></head><body><main id="viewerApp" class="viewer-app" aria-live="polite"><section id="viewerLoading" class="viewer-message"><div><strong>Reise wird geladen …</strong></div></section></main><script id="embeddedTripData" type="application/json">${json}</script><script>${js}<\/script></body></html>`;
+  }
+
+  async function shareTrip() {
+    if(!currentTrip)return;
+    try{
+      const html=await buildStandaloneViewer(currentTrip);
+      const file=new File([html],`${slugify(currentTrip.title)}-travel-tracker.html`,{type:'text/html'});
+      if(navigator.canShare?.({files:[file]}) && navigator.share){
+        await navigator.share({title:currentTrip.title,text:'Travel-Tracker-Reise',files:[file]});
+      }else{
+        downloadBlob(file,file.name);
+        toast('Präsentationsdatei heruntergeladen. Im Browser öffnen.');
+      }
+    }catch(e){console.error(e);toast('Ansicht konnte nicht erstellt werden.');}
+  }
+
+  function previewTrip() {
+    if(!currentTrip)return;
+    const url=new URL('viewer.html',location.href);url.searchParams.set('id',currentTrip.id);
+    window.location.href=url.href;
+  }
+
+  function printTrip() {
+    if(!currentTrip)return;
+    const t=currentTrip;
+    const w=window.open('','_blank');
+    if(!w)return toast('Bitte Pop-ups für die PDF-Ausgabe erlauben.');
+    const cards=t.goals.filter(g=>g.photo).map((g,i)=>`<article class="p-card"><img src="${g.photo}"><div><strong>${safe(g.name||`Ziel ${i+1}`)}</strong><small>${g.capturedAt?new Date(g.capturedAt).toLocaleString('de-DE'):''}</small>${g.info?`<p>${safe(g.info)}</p>`:''}</div></article>`).join('');
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${safe(t.title)}</title><style>@page{size:A4;margin:0}*{box-sizing:border-box}html,body{margin:0}body{font-family:system-ui;background:${t.backgroundCss};background-size:cover;background-position:center}.page{width:210mm;min-height:297mm;padding:14mm;background:linear-gradient(#0002,#0002);color:#fff}.head h1{font-size:28pt;margin:0 0 3mm}.head p{margin:0 0 7mm}.grid{display:grid;grid-template-columns:1fr 1fr;gap:6mm}.p-card{background:#fff;color:#111827;border-radius:5mm;overflow:hidden;break-inside:avoid}.p-card img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}.p-card div{padding:4mm}.p-card strong{font-size:14pt;display:block}.p-card small{color:#667085}.p-card p{font-size:9pt;line-height:1.35;margin:2mm 0 0}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><main class="page"><header class="head"><h1>${safe(t.title)}</h1><p>${safe((t.participants||[]).join(', '))}</p></header><section class="grid">${cards}</section></main><script>setTimeout(()=>window.print(),400)<\/script></body></html>`);w.document.close();
+  }
+
+  // Navigation and home actions
+  els('brandHome').addEventListener('click',()=>{showScreen('home');refreshHome();});
+  document.querySelectorAll('[data-nav]').forEach(btn=>btn.addEventListener('click',()=>showScreen(btn.dataset.nav)));
+  els('newTripBtn').addEventListener('click',()=>{resetWizard();showScreen('categories');});
+  els('libraryNewBtn').addEventListener('click',()=>{resetWizard();showScreen('categories');});
+  els('libraryBtn').addEventListener('click',async()=>{await refreshHome();showScreen('library');});
+  els('showAllBtn').addEventListener('click',async()=>{await refreshHome();showScreen('library');});
+  els('exportAllBtn').addEventListener('click',exportAll);els('libraryExportBtn').addEventListener('click',exportAll);
+  els('importAllBtn').addEventListener('click',()=>els('importPicker').click());els('libraryImportBtn').addEventListener('click',()=>els('importPicker').click());
+  els('importPicker').addEventListener('change',e=>{const f=e.target.files?.[0];if(f)importAllFile(f);e.target.value='';});
+
+  document.querySelectorAll('[data-category]').forEach(btn=>btn.addEventListener('click',()=>{wizard.category=btn.dataset.category;wizard.background=null;renderBackgrounds();showScreen('backgrounds');}));
+  els('decreasePeople').addEventListener('click',()=>{wizard.people=Math.max(1,wizard.people-1);els('peopleCount').value=wizard.people;renderParticipantFields();});
+  els('increasePeople').addEventListener('click',()=>{wizard.people=Math.min(12,wizard.people+1);els('peopleCount').value=wizard.people;renderParticipantFields();});
+  els('decreaseGoals').addEventListener('click',()=>{wizard.goalCount=Math.max(1,wizard.goalCount-1);els('goalCount').value=wizard.goalCount;});
+  els('increaseGoals').addEventListener('click',()=>{wizard.goalCount=Math.min(10,wizard.goalCount+1);els('goalCount').value=wizard.goalCount;});
+  els('continueToLayoutBtn').addEventListener('click',()=>{
+    wizard.title=els('projectTitle').value.trim();
+    wizard.participants=[...els('participantFields').querySelectorAll('input')].map(i=>i.value.trim());
+    if(!wizard.title){toast('Bitte gib dem Tracker einen Titel.');els('projectTitle').focus();return;}
+    if(!wizard.background)wizard.background=BACKGROUNDS[wizard.category][0];
+    renderLayouts();showScreen('layouts');
+  });
+
+  els('trackerHomeBtn').addEventListener('click',async()=>{await saveCurrentTrip();await refreshHome();showScreen('home');});
+  els('saveBtn').addEventListener('click',async()=>{await saveCurrentTrip('Jetzt gespeichert');toast('Tracker gespeichert.');});
+  els('finishBtn').addEventListener('click',async()=>{
+    const missing=currentTrip.goals.filter(g=>!g.photo).length;
+    if(missing){toast(`Noch ${missing} Ziel${missing===1?'':'e'} ohne Foto.`);return;}
+    currentTrip.completed=true;await saveCurrentTrip('Tracker abgeschlossen');updateProgress();toast('Tracker abgeschlossen.');
+  });
+  els('previewTripBtn').addEventListener('click',previewTrip);
+  els('shareFileBtn').addEventListener('click',shareTrip);
+  els('pdfBtn').addEventListener('click',printTrip);
+
+  els('layoutEditBtn').addEventListener('click',()=>{layoutMode=true;els('layoutEditor').classList.remove('hidden');renderGoals();});
+  els('doneLayoutBtn').addEventListener('click',async()=>{layoutMode=false;selectedGoalIndex=-1;els('layoutEditor').classList.add('hidden');await saveCurrentTrip();renderGoals();});
+  els('rotateLeftBtn').addEventListener('click',()=>rotateSelected(-3));els('rotateRightBtn').addEventListener('click',()=>rotateSelected(3));els('rotationResetBtn').addEventListener('click',()=>setRotation(0));
+  function rotateSelected(delta){if(selectedGoalIndex<0)return toast('Bitte zuerst eine Kachel auswählen.');setRotation((currentTrip.goals[selectedGoalIndex].rotation||0)+delta);}
+  function setRotation(v){if(selectedGoalIndex<0)return;currentTrip.goals[selectedGoalIndex].rotation=Math.max(-25,Math.min(25,v));renderGoals();renderSelectionControls();saveCurrentTrip();}
+  els('entrySideSelect').addEventListener('change',()=>{if(selectedGoalIndex<0)return;currentTrip.goals[selectedGoalIndex].entrySide=els('entrySideSelect').value;drawJourneyPath();saveCurrentTrip();});
+  els('exitSideSelect').addEventListener('change',()=>{if(selectedGoalIndex<0)return;currentTrip.goals[selectedGoalIndex].exitSide=els('exitSideSelect').value;drawJourneyPath();saveCurrentTrip();});
+  els('lineStyleSelect').addEventListener('change',()=>{currentTrip.lineStyle=els('lineStyleSelect').value;drawJourneyPath();saveCurrentTrip();});
+  els('resetLayoutBtn').addEventListener('click',()=>{const p=presetPositions(currentTrip.goals.length,currentTrip.layout||'zigzag');currentTrip.goals.forEach((g,i)=>Object.assign(g,{x:p[i].x,y:p[i].y,rotation:p[i].rotation,entrySide:'auto',exitSide:'auto'}));renderGoals();saveCurrentTrip();});
+
+  // Goal dialog
+  els('takePhotoBtn').addEventListener('click',()=>els('cameraPicker').click());
+  els('choosePhotoBtn').addEventListener('click',()=>els('photoPicker').click());
+  els('cameraPicker').addEventListener('change',async e=>{await applyPickedPhoto(e.target.files?.[0]);e.target.value='';});
+  els('photoPicker').addEventListener('change',async e=>{await applyPickedPhoto(e.target.files?.[0]);e.target.value='';});
+  els('removePhotoBtn').addEventListener('click',async()=>{if(editGoalIndex<0)return;currentTrip.goals[editGoalIndex].photo=null;renderDialogPhoto(null);els('removePhotoBtn').classList.add('hidden');await saveCurrentTrip();});
+  els('placeNameInput').addEventListener('input',updateMapsLink);
+  els('showMapPreviewBtn').addEventListener('click',showMapPreview);
+  els('removePlaceBtn').addEventListener('click',()=>{els('placeNameInput').value='';els('mapsUrlInput').value='';els('mapPreviewWrap').classList.add('hidden');els('mapPreviewFrame').src='about:blank';els('removePlaceBtn').classList.add('hidden');updateMapsLink();});
+  els('goalForm').addEventListener('submit',e=>{if(e.submitter?.value==='cancel')return; e.preventDefault(); saveGoalFromDialog();});
+
+  els('confirmActionBtn').addEventListener('click',async e=>{e.preventDefault();const cb=confirmCallback;confirmCallback=null;els('confirmDialog').close();if(cb)await cb();});
+
+  window.addEventListener('resize',()=>{if(currentTrip && els('screenTracker').classList.contains('active'))drawJourneyPath();});
+
+  resetWizard();
+  refreshHome();
+})();

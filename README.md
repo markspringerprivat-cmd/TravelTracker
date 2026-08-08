@@ -1,23 +1,29 @@
 # Travel Tracker
 
-Statische GitHub-Pages-App mit lokaler Speicherung per IndexedDB.
+Statische Web-App für GitHub Pages.
 
 ## Dateien
-- `index.html` – Erstellen und Bearbeiten der Tracker
-- `viewer.html` – eigene Vollbild-Reiseansicht im Browser
-- `app.js` / `styles.css` – Hauptanwendung
-- `viewer.js` / `viewer.css` – interaktive Reisepräsentation
-- `assets/` – Hintergründe
-
-## Neu in dieser Version
-- „Reise ansehen“ öffnet `viewer.html?id=...` statt einer lokal erzeugten HTML-Datei. Die Viewer-Seite liest die Reise aus derselben IndexedDB und läuft als normale GitHub-Pages-Webseite.
-- Kein GPS- oder Browser-Standortzugriff mehr.
-- Ziele können optional einen Ort/Adresse und einen Google-Maps-Link speichern.
-- Google-Maps-Suche erfolgt über Maps URLs ohne API-Key.
-- Schnellzugriff und Bibliothek haben pro Tracker ein X zum Löschen mit Bestätigungsdialog.
+- `index.html` – Haupt-App zum Erstellen und Bearbeiten
+- `styles.css` – Haupt-App-Design
+- `app.js` – lokale Speicherung, Editor, Export/Import, Teilen
+- `viewer.html` – eigene Reise-Präsentationsseite
+- `viewer.css` – Vollbild-Slider
+- `viewer.js` – Viewer-Logik
+- `assets/` – lokale Hintergrundbilder
 
 ## GitHub Pages
-Alle Dateien in dasselbe Repository hochladen. In GitHub unter Settings → Pages die Veröffentlichung aus dem gewünschten Branch aktivieren.
+Alle Dateien aus dem ZIP in das Repository hochladen. Danach unter **Settings → Pages** den Branch (z. B. `main`) und `/root` auswählen.
 
-## Hinweis zum Teilen
-Die lokale `viewer.html?id=...`-Ansicht funktioniert auf demselben Browser/Gerät, weil die Reise in IndexedDB liegt. Für einen echten Link, den andere Geräte ohne Import öffnen können, ist später ein Online-Speicher/Backend für Tracker und Fotos nötig. Der bestehende Button „Ansicht teilen“ erzeugt deshalb weiterhin eine portable HTML-Datei.
+`Reise ansehen` öffnet `viewer.html?id=<tracker-id>`. Da `index.html` und `viewer.html` dieselbe GitHub-Pages-Domain verwenden, kann der Viewer die lokal gespeicherte Reise aus IndexedDB lesen.
+
+## Teilen
+`Ansicht teilen` erzeugt weiterhin eine selbständige HTML-Datei, bettet aber jetzt **denselben Viewer** (CSS + JavaScript) ein. Für einen echten öffentlich teilbaren Web-Link auf ein anderes Gerät wäre später ein Online-Speicher/Backend nötig, weil IndexedDB nur lokal auf dem jeweiligen Browser existiert.
+
+## Google Maps
+Der Tracker fragt **keine GPS-Daten** mehr ab. Ein Ort wird manuell eingegeben. Die App kann:
+- eine Google-Maps-Suche in einem neuen Tab öffnen,
+- eine Kartenvorschau im Bearbeitungsdialog anzeigen,
+- einen Google-Maps-Link zur Station speichern,
+- den Ort später im Viewer als anklickbaren Chip anzeigen.
+
+Für einen echten eingebetteten Places-Picker mit Autocomplete und Rückgabe einer eindeutigen Place-ID wäre ein Google-Maps-Platform-API-Key erforderlich.
