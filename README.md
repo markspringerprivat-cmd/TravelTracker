@@ -6,7 +6,7 @@ Statische GitHub-Pages-App zum Planen und Festhalten von Reisen, Wanderungen und
 
 - `index.html` – Haupt-App
 - `styles.css` – Oberfläche und Vollbild-Editor
-- `app.js` – Erstellung, Bearbeitung, Export/Import, PDF und Karten-Picker
+- `app.js` – Erstellung, Bearbeitung, Export/Import, echte A4-PDF-Erzeugung und Karten-Picker
 - `core.js` – IndexedDB und gemeinsame Hilfsfunktionen
 - `viewer.html` – eigenständige Reiseansicht
 - `viewer.css` – Vollbild-Slider und Foto-Lightbox
@@ -77,3 +77,7 @@ Tracker und Fotos werden in IndexedDB im Browser gespeichert. `Alle exportieren`
 ## GitHub Pages
 
 Alle Dateien einschließlich des Ordners `assets` in das Repository hochladen und vorhandene Versionen vollständig ersetzen. Danach unter **Settings → Pages** den gewünschten Branch als Quelle auswählen.
+
+## PDF-Export
+
+Der Button **PDF herunterladen** erzeugt eine echte DIN-A4-PDF direkt im Browser. Es wird weder `window.print()` noch ein Pop-up verwendet. Die PDF-Erzeugung ist vollständig im Projekt enthalten und benötigt keine zusätzliche PDF-Bibliothek. Fotos werden für die tatsächliche A4-Druckgröße auf ungefähr 300-dpi-Niveau vorbereitet; die lokal gespeicherten Originalbilder bleiben unverändert.
