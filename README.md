@@ -9,7 +9,7 @@ Statische GitHub-Pages-App zum Planen und Festhalten von Reisen, Wanderungen und
 - `app.js` – Erstellung, Bearbeitung, Export/Import, echte A4-PDF-Erzeugung und Karten-Picker
 - `core.js` – IndexedDB und gemeinsame Hilfsfunktionen
 - `viewer.html` – eigenständige Reiseansicht
-- `viewer.css` – Vollbild-Slider und Foto-Lightbox
+- `viewer.css` – Vollbild-Slider, animierter Reiseweg und Foto-Lightbox
 - `viewer.js` – Präsentationslogik
 - `assets/` – lokale Bildressourcen
 
@@ -72,7 +72,7 @@ Tracker und Fotos werden in IndexedDB im Browser gespeichert. `Alle exportieren`
 
 `Reise ansehen` öffnet `viewer.html` als eigenständige Vollbild-Webseite und liest die Reise aus derselben IndexedDB.
 
-`Ansicht teilen` erzeugt eine eigenständige HTML-Präsentation mit eingebetteten Fotos und Daten. Der Viewer enthält Slider, Lightbox, optionale Informationstexte, Emojis und anklickbare Google-Maps-Orte.
+`Ansicht teilen` erzeugt eine eigenständige HTML-Präsentation mit eingebetteten Fotos und Daten. Der Viewer enthält einen ruhigen animierten Reiseweg: Vor jeder Station zeichnet sich eine gestrichelte Kurve Stück für Stück ein, danach erscheint die Erinnerungskarte. Beim Weitergehen setzt sich die Linie hinter der Karte bis zum Bildschirmrand fort, der Slider fährt zur nächsten Station und der Weg wird dort bis zur neuen Karte weitergezeichnet. Zusätzlich enthält der Viewer Lightbox, optionale Informationstexte, Emojis und anklickbare Google-Maps-Orte.
 
 ## GitHub Pages
 
